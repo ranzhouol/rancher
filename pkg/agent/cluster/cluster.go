@@ -72,6 +72,7 @@ func getTokenFromAPI() ([]byte, []byte, error) {
 }
 
 func Params() (map[string]interface{}, error) {
+	//1、 CA cert、service account token、APIServer endpoint
 	caData, token, err := getTokenFromAPI()
 	if err != nil {
 		return nil, errors.Wrapf(err, "looking up %s/%s ca/token", namespace.System, "cattle")

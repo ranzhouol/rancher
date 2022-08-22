@@ -24,12 +24,13 @@ var (
 )
 
 func Register(ctx context.Context, wrangler *wrangler.Context) {
+	// 1、构建检测函数
 	c := checker{
 		clusterCache: wrangler.Mgmt.Cluster().Cache(),
 		clusters:     wrangler.Mgmt.Cluster(),
 		tunnelServer: wrangler.TunnelServer,
 	}
-
+	// 2、启动检测线程，15s检测依次，内部使用的是rancher封装的定时器
 	go func() {
 		for range ticker.Context(ctx, 15*time.Second) {
 			if err := c.check(); err != nil {
@@ -46,11 +47,12 @@ type checker struct {
 }
 
 func (c *checker) check() error {
+	// 1、获取所有的集群
 	clusters, err := c.clusterCache.List(labels.Everything())
 	if err != nil {
 		return err
 	}
-
+	// 2、检测集群状态
 	for _, cluster := range clusters {
 		if err := c.checkCluster(cluster); err != nil {
 			logrus.Errorf("failed to check connectivity of cluster [%s]", cluster.Name)
@@ -65,7 +67,7 @@ func (c *checker) hasSession(cluster *v3.Cluster) bool {
 	if !hasSession {
 		return false
 	}
-
+	// 1、代理处理方法入口
 	dialer := c.tunnelServer.Dialer(clientKey)
 	transport := &http.Transport{
 		DialContext: dialer,
@@ -74,6 +76,7 @@ func (c *checker) hasSession(cluster *v3.Cluster) bool {
 	client := &http.Client{
 		Transport: transport,
 	}
+	//2、这里可以直接写url，会直接调用后面的集群的url
 	resp, err := client.Get("http://not-used/ping")
 	if err != nil {
 		return false
@@ -89,7 +92,7 @@ func (c *checker) checkCluster(cluster *v3.Cluster) error {
 	if cluster.Spec.Internal {
 		return nil
 	}
-
+	// 1、检测集群，通过后面的url请求来判断集群的工作状态
 	hasSession := c.hasSession(cluster)
 	// The simpler condition of hasSession == Connected.IsTrue(cluster) is not
 	// used because it treats a non-existent conditions as False
@@ -102,7 +105,7 @@ func (c *checker) checkCluster(cluster *v3.Cluster) error {
 	var (
 		err error
 	)
-
+	// 2、更新集群的状态，这里为什么要循环3次，？？？？
 	for i := 0; i < 3; i++ {
 		cluster = cluster.DeepCopy()
 		Connected.SetStatusBool(cluster, hasSession)

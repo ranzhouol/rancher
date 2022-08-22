@@ -161,7 +161,7 @@ func GetAlertManagerDefaultConfig() *alertconfig.Config {
 }
 
 func (m *AlertManager) GetAlertList() ([]*APIAlert, error) {
-
+	//1、获取url
 	url, err := m.GetAlertManagerEndpoint()
 	if err != nil {
 		return nil, err
@@ -170,12 +170,12 @@ func (m *AlertManager) GetAlertList() ([]*APIAlert, error) {
 		Data   []*APIAlert `json:"data"`
 		Status string      `json:"status"`
 	}{}
-
+	//2、创建httpclient 请求
 	req, err := http.NewRequest(http.MethodGet, url+"/api/v1/alerts", nil)
 	if err != nil {
 		return nil, err
 	}
-
+	//3、请求数据
 	resp, err := m.client.Do(req)
 	if err != nil {
 		return nil, err

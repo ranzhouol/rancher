@@ -89,6 +89,7 @@ func getTokenFromToken(ctx context.Context, tokenBytes []byte) ([]byte, error) {
 }
 
 func startPeerManager(ctx context.Context, endpoints corecontrollers.EndpointsController, server *remotedialer.Server) (peermanager.PeerManager, error) {
+	//获取token
 	tokenBytes, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/token")
 	if os.IsNotExist(err) || settings.Namespace.Get() == "" || settings.PeerServices.Get() == "" {
 		logrus.Infof("Running in single server mode, will not peer connections")
@@ -119,7 +120,7 @@ func startPeerManager(ctx context.Context, endpoints corecontrollers.EndpointsCo
 		peers:     map[string]bool{},
 		listeners: map[chan<- peermanager.Peers]bool{},
 	}
-
+	// 1、监听endpoints变化
 	endpoints.OnChange(ctx, "peer-manager-controller", pm.syncService)
 	return pm, nil
 }

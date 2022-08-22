@@ -101,7 +101,7 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 	if err != nil {
 		return nil, err
 	}
-
+	// 1、验证 restConfig 是否可用
 	restConfig, err = setupAndValidationRESTConfig(ctx, restConfig)
 	if err != nil {
 		return nil, err
@@ -111,16 +111,16 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 	if err := migrateEncryptionConfig(ctx, restConfig); err != nil {
 		return nil, err
 	}
-
+	// 2、构建wranglerContext，启动websocket server 重点
 	wranglerContext, err := wrangler.NewContext(ctx, clientConfg, restConfig)
 	if err != nil {
 		return nil, err
 	}
-
+	//3、页面早期数据获取，获取fleet-local 和cattle-system 的命名空间，如果没有则重新创建
 	if err := dashboarddata.EarlyData(ctx, wranglerContext.K8s); err != nil {
 		return nil, err
 	}
-
+	//4、构建rancher service 和对应的endpoint 和webhook
 	if opts.Embedded {
 		if err := setupRancherService(ctx, restConfig, opts.HTTPSListenPort); err != nil {
 			return nil, err
@@ -129,10 +129,11 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 			return nil, err
 		}
 	}
-
+	//5、构建MultiClusterManager 重点
 	wranglerContext.MultiClusterManager = newMCM(wranglerContext, opts)
 
 	// Initialize Features as early as possible
+	//6、初始化所有的FeatureCRD 和对CRD资源进行补全操作
 	if err := crds.CreateFeatureCRD(ctx, restConfig); err != nil {
 		return nil, err
 	}
@@ -141,11 +142,11 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		return nil, fmt.Errorf("migrating features: %w", err)
 	}
 	features.InitializeFeatures(wranglerContext.Mgmt.Feature(), opts.Features)
-
+	// 7、注册podsecuritypolicytemplate，kontainerdriver，managementauth 用于wrangler启动的时候controller直接工作
 	podsecuritypolicytemplate.RegisterIndexers(wranglerContext)
 	kontainerdriver.RegisterIndexers(wranglerContext)
 	managementauth.RegisterWranglerIndexers(wranglerContext)
-
+	//8、构建webhook的crd
 	if err := crds.Create(ctx, restConfig); err != nil {
 		return nil, err
 	}
@@ -156,7 +157,7 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 			return nil, err
 		}
 	}
-
+	// 9、判断是否开启多租户功能
 	if features.Auth.Enabled() {
 		authServer, err = auth.NewServer(ctx, restConfig)
 		if err != nil {
@@ -168,7 +169,7 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 			return nil, err
 		}
 	}
-
+	//10、构建steve Kubernetes API Translator
 	steve, err := steveserver.New(ctx, restConfig, &steveserver.Options{
 		ServerVersion:   settings.ServerVersion.Get(),
 		Controllers:     wranglerContext.Controllers,
@@ -180,9 +181,9 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 	if err != nil {
 		return nil, err
 	}
-
+	//11、集群代理，请求下游集群的路由 和handler
 	clusterProxy, err := proxy.NewProxyMiddleware(wranglerContext.K8s.AuthorizationV1(),
-		wranglerContext.TunnelServer.Dialer,
+		wranglerContext.TunnelServer.Dialer, // 代理方法的入口函数
 		wranglerContext.Mgmt.Cluster().Cache(),
 		localClusterEnabled(opts),
 		steve,
@@ -203,15 +204,15 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		return nil, err
 	}
 	aggregationMiddleware := aggregation.NewMiddleware(ctx, wranglerContext.Mgmt.APIService(), wranglerContext.TunnelServer)
-
+	// 12、构建rancher
 	return &Rancher{
 		Auth: authServer.Authenticator.Chain(
 			auditFilter),
-		Handler: responsewriter.Chain{
-			auth.SetXAPICattleAuthHeader,
-			responsewriter.ContentTypeOptions,
-			websocket.NewWebsocketHandler,
-			proxy.RewriteLocalCluster,
+		Handler: responsewriter.Chain{ // rancher的处理链
+			auth.SetXAPICattleAuthHeader,      // 授权检测
+			responsewriter.ContentTypeOptions, // 添加请求头 X-Content-Type-Options
+			websocket.NewWebsocketHandler,     // 转化为websocker
+			proxy.RewriteLocalCluster,         // 重写到本地cluster
 			clusterProxy,
 			aggregationMiddleware,
 			additionalAPIPreMCM,
@@ -229,6 +230,7 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 }
 
 func (r *Rancher) Start(ctx context.Context) error {
+	// 1、往Wrangler注册不同的crd资源
 	if err := dashboardapi.Register(ctx, r.Wrangler); err != nil {
 		return err
 	}
@@ -236,7 +238,7 @@ func (r *Rancher) Start(ctx context.Context) error {
 	if err := steveapi.Setup(ctx, r.Steve, r.Wrangler); err != nil {
 		return err
 	}
-
+	// 2、启动Start，之后controller 可以监听不同的资源变化，后面调用DeferredServer
 	if features.MCM.Enabled() {
 		if err := r.Wrangler.MultiClusterManager.Start(ctx); err != nil {
 			return err
@@ -275,19 +277,21 @@ func (r *Rancher) Start(ctx context.Context) error {
 
 	r.Wrangler.OnLeader(r.authServer.OnLeader)
 	r.auditLog.Start(ctx)
-
+	// 3、启动Wrangler
 	return r.Wrangler.Start(ctx)
 }
 
 func (r *Rancher) ListenAndServe(ctx context.Context) error {
+	//1、核心服务启动
 	if err := r.Start(ctx); err != nil {
 		return err
 	}
 
 	r.Wrangler.MultiClusterManager.Wait(ctx)
-
+	// 2、监听Secret的变化
 	r.startAggregation(ctx)
 	go r.Steve.StartAggregation(ctx)
+	//3、启动ListenAndServe，把所有的handler 都放到http server 中
 	if err := tls.ListenAndServe(ctx, r.Wrangler.RESTConfig,
 		r.Auth(r.Handler),
 		r.opts.BindHost,
@@ -318,7 +322,9 @@ func newMCM(wrangler *wrangler.Context, opts *Options) wrangler.MultiClusterMana
 }
 
 func setupAndValidationRESTConfig(ctx context.Context, restConfig *rest.Config) (*rest.Config, error) {
+	// 1、steveserver
 	restConfig = steveserver.RestConfigDefaults(restConfig)
+	// 2、每2s请求一个集群的server version 直到返回成功
 	return restConfig, k8scheck.Wait(ctx, *restConfig)
 }
 
@@ -332,6 +338,7 @@ func localClusterEnabled(opts *Options) bool {
 // setupRancherService will ensure that a Rancher service with a custom endpoint exists that will be used
 // to access Rancher
 func setupRancherService(ctx context.Context, restConfig *rest.Config, httpsListenPort int) error {
+	//1、构建clientset
 	clientset, err := kubernetes.NewForConfig(restConfig)
 	if err != nil {
 		return fmt.Errorf("error setting up kubernetes clientset while setting up rancher service: %w", err)

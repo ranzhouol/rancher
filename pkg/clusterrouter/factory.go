@@ -45,12 +45,13 @@ func (s *factory) lookupCluster(clusterID string) (*v3.Cluster, http.Handler) {
 }
 
 func (s *factory) get(req *http.Request) (*v3.Cluster, http.Handler, error) {
+	//1、查阅集群
 	cluster, err := s.clusterLookup.Lookup(req)
 	if err != nil || cluster == nil {
 		return nil, nil, err
 	}
 	clusterID := cluster.Name
-
+	//2、构建handler newCluster，下面的写法大概率是双重检测
 	if newCluster, handler := s.lookupCluster(clusterID); newCluster != nil {
 		return newCluster, handler, nil
 	}
@@ -61,7 +62,7 @@ func (s *factory) get(req *http.Request) (*v3.Cluster, http.Handler, error) {
 	if newCluster, handler := s.lookupCluster(clusterID); newCluster != nil {
 		return newCluster, handler, nil
 	}
-
+	//3、第一次map没有，需要先创建在存储，这也相当于每个集群都要自己的代理服务
 	var srv interface{}
 	srv, err = s.newServer(cluster)
 	if err != nil || srv == nil {
@@ -70,7 +71,7 @@ func (s *factory) get(req *http.Request) (*v3.Cluster, http.Handler, error) {
 
 	srv, _ = s.servers.LoadOrStore(cluster.Name, srv)
 	s.clusters.LoadOrStore(cluster.Name, cluster)
-
+	//4、这里的handler()，是srv中的ServeHTTP
 	return cluster, srv.(server).Handler(), nil
 }
 

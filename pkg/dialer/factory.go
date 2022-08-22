@@ -35,7 +35,7 @@ func NewFactory(apiContext *config.ScaledContext, wrangler *wrangler.Context) (*
 	return &Factory{
 		clusterLister: apiContext.Management.Clusters("").Controller().Lister(),
 		nodeLister:    apiContext.Management.Nodes("").Controller().Lister(),
-		TunnelServer:  wrangler.TunnelServer,
+		TunnelServer:  wrangler.TunnelServer, // 把创建好的websocket 赋值过来
 	}, nil
 }
 
@@ -45,6 +45,8 @@ type Factory struct {
 	TunnelServer  *remotedialer.Server
 }
 
+// 1、返回的是dialer，用于构建httpclient
+//2 、构建dialer，之后可以在httpclient中直接使用
 func (f *Factory) ClusterDialer(clusterName string) (dialer.Dialer, error) {
 	return func(ctx context.Context, network, address string) (net.Conn, error) {
 		d, err := f.clusterDialer(clusterName, address)
@@ -173,6 +175,7 @@ func (f *Factory) translateClusterAddress(cluster *v3.Cluster, clusterHostPort, 
 	return address
 }
 
+// 获取下游集群的Dialer，用于请求下游集群服务
 func (f *Factory) clusterDialer(clusterName, address string) (dialer.Dialer, error) {
 	cluster, err := f.clusterLister.Get("", clusterName)
 	if err != nil {
@@ -190,9 +193,10 @@ func (f *Factory) clusterDialer(clusterName, address string) (dialer.Dialer, err
 		// For cloud drivers we just connect directly to the k8s API, not through the tunnel.  All other go through tunnel
 		return native()
 	}
-
+	// 1、查询到具体的集群，检测下游集群的websocket client 是否还在
 	if f.TunnelServer.HasSession(cluster.Name) {
 		logrus.Tracef("dialerFactory: tunnel session found for cluster [%s]", cluster.Name)
+		//2、代理方法入口
 		cd := f.TunnelServer.Dialer(cluster.Name)
 		return func(ctx context.Context, network, address string) (net.Conn, error) {
 			if cluster.Status.Driver == v32.ClusterDriverRKE {
@@ -205,6 +209,7 @@ func (f *Factory) clusterDialer(clusterName, address string) (dialer.Dialer, err
 	logrus.Tracef("dialerFactory: no tunnel session found for cluster [%s], falling back to nodeDialer", cluster.Name)
 
 	// Try to connect to a node for the cluster dialer
+	//2、如果Session不存在，尝试链接node
 	nodes, err := f.nodeLister.List(cluster.Name, labels.Everything())
 	if err != nil {
 		return nil, err

@@ -43,6 +43,7 @@ func NewMiddleware(ctx context.Context, apiServices mgmtcontrollers.APIServiceCo
 	}
 	relatedresource.WatchClusterScoped(ctx, "aggregation-router", relatedresource.TriggerAllKey,
 		apiServices, apiServices)
+	//1、判断apiServices 的变化
 	apiServices.OnChange(ctx, "apiservice-router", handler.OnChange)
 	return handler.Middleware
 }
@@ -66,6 +67,7 @@ func (h *aggregationHandler) next(notFound http.Handler) http.Handler {
 func (h *aggregationHandler) setEntries(routes []routeEntry) {
 	mux := mux.NewRouter()
 	mux.UseEncodedPath()
+	//1、构建路由和处理函数
 	for _, entry := range routes {
 		if entry.prefix != "" {
 			mux.PathPrefix(entry.prefix).Handler(h.makeHandler(entry.uuid))
@@ -85,6 +87,7 @@ func keyFromUUID(uuid string) string {
 }
 
 func (h *aggregationHandler) makeHandler(uuid string) http.Handler {
+	//1、使用UUID左右key
 	key := keyFromUUID(uuid)
 	cfg := &rest.Config{
 		Host:      "http://" + key,
@@ -93,7 +96,7 @@ func (h *aggregationHandler) makeHandler(uuid string) http.Handler {
 			DialContext: h.remote.Dialer(key),
 		},
 	}
-
+	//2、构建 自定义的handler
 	next := proxy.ImpersonatingHandler("", cfg)
 	return http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
 		for i := 0; i < 15; i++ {

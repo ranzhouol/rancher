@@ -52,7 +52,7 @@ func Run(ctx context.Context) error {
 		ctx:          ctx,
 		serviceCache: core.Core().V1().Service().Cache(),
 	}
-
+	//1、监听rancher-installed service 的变化，猜测：监听的目的是为了卸载agent使用
 	core.Core().V1().Service().OnChange(ctx, "rancher-installed", h.OnChange)
 	if err := core.Start(ctx, 1); err != nil {
 		return err
@@ -81,6 +81,7 @@ func (h *handler) startRancher() {
 		logrus.Fatalf("Embedded rancher failed to initialize: %v", err)
 	}
 	go func() {
+		// 2、开启http Server
 		err = server.ListenAndServe(h.ctx)
 		logrus.Fatalf("Embedded rancher failed to start: %v", err)
 	}()

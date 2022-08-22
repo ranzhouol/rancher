@@ -184,6 +184,7 @@ func run(ctx context.Context) error {
 	topContext := signals.SetupSignalContext()
 
 	logrus.Infof("Rancher agent version %s is starting", VERSION)
+	// 1、获取集群的参数
 	params, err := getParams()
 	if err != nil {
 		return err
@@ -193,12 +194,12 @@ func run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-
+	//2、获取token
 	token, server, err := getTokenAndURL()
 	if err != nil {
 		return err
 	}
-
+	//3、对参数和token进行序列化
 	headers := map[string][]string{
 		Token:                      {token},
 		rkenodeconfigclient.Params: {base64.StdEncoding.EncodeToString(bytes)},
@@ -302,10 +303,12 @@ func run(ctx context.Context) error {
 			return certErr
 		}
 	}
-
+	//4、构建websocket的回调函数，
 	onConnect := func(ctx context.Context, _ *remotedialer.Session) error {
+		// 4.1、创建链接标识
 		connected()
 		connectConfig := fmt.Sprintf("https://%s/v3/connect/config", serverURL.Host)
+		//4.2 RKE node的相关操作
 		interval, err := rkenodeconfigclient.ConfigClient(ctx, connectConfig, headers, writeCertsOnly)
 		if err != nil {
 			return err
@@ -333,6 +336,7 @@ func run(ctx context.Context) error {
 			for {
 				select {
 				case <-time.After(tt):
+					// 1、重新建立连接
 					receivedInterval, err := rkenodeconfigclient.ConfigClient(ctx, connectConfig, headers, writeCertsOnly)
 					if err != nil {
 						logrus.Errorf("failed to check plan: %v", err)
@@ -357,12 +361,14 @@ func run(ctx context.Context) error {
 	}
 
 	for {
+		//建立websocket 通道，每5s重试一次
 		wsURL := fmt.Sprintf("wss://%s/v3/connect", serverURL.Host)
 		if !isConnect() {
 			wsURL += "/register"
 		}
 		logrus.Infof("Connecting to %s with token starting with %s", wsURL, token[:len(token)/2])
 		logrus.Tracef("Connecting to %s with token %s", wsURL, token)
+		// 5、remotedialer 进行链接，已经注册回调函数，这里会创建session 并启动接收数据的函数等待websocket client 接收到数据
 		remotedialer.ClientConnect(ctx, wsURL, headers, nil, func(proto, address string) bool {
 			switch proto {
 			case "tcp":

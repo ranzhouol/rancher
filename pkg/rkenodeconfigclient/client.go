@@ -50,11 +50,13 @@ func newErrNodeOrClusterNotFound(msg, occursType string) *ErrNodeOrClusterNotFou
 	}
 }
 
+//
 func ConfigClient(ctx context.Context, url string, header http.Header, writeCertOnly bool) (int, error) {
 	// try a few more times because there is a delay after registering a new node
 	nodeOrClusterNotFoundRetryLimit := 3
 	interval := 120
 	for {
+		//client：httpclient nc：rke node 的相关信息
 		nc, err := getConfig(client, url, header)
 		if err != nil {
 			if _, ok := err.(*ErrNodeOrClusterNotFound); ok {
@@ -113,6 +115,7 @@ func ConfigClient(ctx context.Context, url string, header http.Header, writeCert
 	}
 }
 
+// 请求纳管平台的数据，请求URL是：https://%s/v3/connect/config
 func getConfig(client *http.Client, url string, header http.Header) (*rkeworker.NodeConfig, error) {
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {

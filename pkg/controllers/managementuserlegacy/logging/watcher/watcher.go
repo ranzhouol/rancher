@@ -37,6 +37,7 @@ func StartEndpointWatcher(ctx context.Context, cluster *config.UserContext) {
 }
 
 func (e *endpointWatcher) watch(ctx context.Context, interval time.Duration) {
+	//1、每120s 检测目标集群和目标项目
 	for range ticker.Context(ctx, interval) {
 		if err := e.checkClusterTarget(ctx); err != nil {
 			logrus.Error(err)
@@ -67,6 +68,7 @@ func (e *endpointWatcher) checkClusterTarget(ctx context.Context) error {
 	if wl == nil {
 		err = nil
 	} else {
+		// 测试服务的可达性
 		err = wl.TestReachable(ctx, clusterDialer, false)
 	}
 

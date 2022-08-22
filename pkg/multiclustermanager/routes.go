@@ -38,7 +38,9 @@ import (
 
 func router(ctx context.Context, localClusterEnabled bool, tunnelAuthorizer *mcmauthorizer.Authorizer, scaledContext *config.ScaledContext, clusterManager *clustermanager.Manager) (func(http.Handler) http.Handler, error) {
 	var (
-		k8sProxy             = k8sProxyPkg.New(scaledContext, scaledContext.Dialer, clusterManager)
+		// 构建代理处理器
+		k8sProxy = k8sProxyPkg.New(scaledContext, scaledContext.Dialer, clusterManager)
+		// 这里是web client的处理方式，处理的形式和remotedialer一样，主要是接收链接请求，之后生成session、建立Tunnel
 		connectHandler       = scaledContext.Dialer.(*rancherdialer.Factory).TunnelServer
 		connectConfigHandler = rkenodeconfigserver.Handler(tunnelAuthorizer, scaledContext)
 		clusterImport        = clusterregistrationtokens.ClusterImport{Clusters: scaledContext.Management.Clusters("")}
@@ -53,7 +55,7 @@ func router(ctx context.Context, localClusterEnabled bool, tunnelAuthorizer *mcm
 	if err != nil {
 		return nil, err
 	}
-
+	//管理接口创建，平台相关资源初始化
 	managementAPI, err := managementapi.New(ctx, scaledContext, clusterManager, k8sProxy, localClusterEnabled)
 	if err != nil {
 		return nil, err
@@ -63,7 +65,7 @@ func router(ctx context.Context, localClusterEnabled bool, tunnelAuthorizer *mcm
 	if err != nil {
 		return nil, err
 	}
-
+	//监控数据的处理接口
 	metricsHandler := metrics.NewMetricsHandler(scaledContext, clusterManager, promhttp.Handler())
 
 	channelserver := channelserver.NewHandler(ctx)
@@ -74,7 +76,7 @@ func router(ctx context.Context, localClusterEnabled bool, tunnelAuthorizer *mcm
 
 	unauthed.Path("/").MatcherFunc(parse.MatchNotBrowser).Handler(managementAPI)
 	unauthed.Handle("/v3/connect/config", connectConfigHandler)
-	unauthed.Handle("/v3/connect", connectHandler)
+	unauthed.Handle("/v3/connect", connectHandler) // agent websocket client 连接请求
 	unauthed.Handle("/v3/connect/register", connectHandler)
 	unauthed.Handle("/v3/import/{token}_{clusterId}.yaml", http.HandlerFunc(clusterImport.ClusterImportHandler))
 	unauthed.Handle("/v3/settings/cacerts", managementAPI).MatcherFunc(onlyGet)

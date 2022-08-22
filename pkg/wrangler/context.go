@@ -191,6 +191,7 @@ func enableProtobuf(cfg *rest.Config) *rest.Config {
 }
 
 func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restConfig *rest.Config) (*Context, error) {
+	//1、构建controllerFactory
 	controllerFactory, err := controller.NewSharedControllerFactoryFromConfig(enableProtobuf(restConfig), Scheme)
 	if err != nil {
 		return nil, err
@@ -298,15 +299,16 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 		CachedDiscovery: cache,
 		RESTMapper:      restMapper,
 	}
-
+	//2、构建systemCharts
 	systemCharts, err := system.NewManager(ctx, restClientGetter, content, helmop, steveControllers.Core.Pod(),
 		mgmt.Management().V3().Setting(), ctlg.Catalog().V1().ClusterRepo())
 	if err != nil {
 		return nil, err
 	}
-
+	// 构建websocket server,添加自定义的授权信息
 	tunnelAuth := &tunnelserver.Authorizers{}
 	tunnelServer := remotedialer.New(tunnelAuth.Authorize, tunnelserver.ErrorWriter)
+	// 构建peerManager？？？猜测是用于访问同级的集群的
 	peerManager, err := tunnelserver.NewPeerManager(ctx, steveControllers.Core.Endpoints(), tunnelServer)
 	if err != nil {
 		return nil, err
@@ -319,7 +321,7 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 		}
 		return nil
 	})
-
+	// 构建Context
 	return &Context{
 		Controllers:             steveControllers,
 		Apply:                   apply,
@@ -348,7 +350,7 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 		HelmOperations:          helmop,
 		SystemChartsManager:     systemCharts,
 		TunnelAuthorizer:        tunnelAuth,
-		TunnelServer:            tunnelServer,
+		TunnelServer:            tunnelServer, // websocket server
 	}, nil
 }
 

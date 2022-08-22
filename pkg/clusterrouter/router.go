@@ -16,13 +16,16 @@ type Router struct {
 }
 
 func New(localConfig *rest.Config, lookup ClusterLookup, dialer dialer.Factory, clusterLister v3.ClusterLister, clusterContextGetter proxy.ClusterContextGetter) http.Handler {
+	// 构建router
 	serverFactory := newFactory(localConfig, dialer, lookup, clusterLister, clusterContextGetter)
 	return &Router{
 		serverFactory: serverFactory,
 	}
 }
 
+// 代理请求的处理函数
 func (r *Router) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+	//1、调用factory get方法，获取handler
 	c, handler, err := r.serverFactory.get(req)
 	if err != nil {
 		e, ok := err.(*httperror.APIError)
@@ -38,7 +41,7 @@ func (r *Router) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		response(rw, httperror.NotFound, "No cluster available")
 		return
 	}
-
+	//2、这里会调用对应的proxy_server的ServeHTTP方法
 	handler.ServeHTTP(rw, req)
 }
 

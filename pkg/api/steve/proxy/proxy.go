@@ -60,7 +60,7 @@ func NewProxyMiddleware(sar v1.AuthorizationV1Interface,
 	if err != nil {
 		return nil, err
 	}
-
+	// 1、创建代理处理方法
 	proxyHandler := NewProxyHandler(authorizer, dialerFactory, clusters)
 
 	mux := gmux.NewRouter()

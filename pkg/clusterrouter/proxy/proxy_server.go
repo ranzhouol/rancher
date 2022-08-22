@@ -70,6 +70,7 @@ func prefix(cluster *v3.Cluster) string {
 }
 
 func New(localConfig *rest.Config, cluster *v3.Cluster, clusterLister v3.ClusterLister, factory dialer.Factory, clusterContextGetter ClusterContextGetter) (*RemoteService, error) {
+	//1、分为本地代理和远程代理
 	if cluster.Spec.Internal {
 		return NewLocal(localConfig, cluster)
 	}
@@ -112,7 +113,7 @@ func NewRemote(cluster *v3.Cluster, clusterLister v3.ClusterLister, factory dial
 	if !v32.ClusterConditionProvisioned.IsTrue(cluster) {
 		return nil, httperror.NewAPIError(httperror.ClusterUnavailable, "cluster not provisioned")
 	}
-
+	//1、通过集群的APIEndpoint，获取url
 	urlGetter := func() (url.URL, error) {
 		newCluster, err := clusterLister.Get("", cluster.Name)
 		if err != nil {
@@ -125,12 +126,12 @@ func NewRemote(cluster *v3.Cluster, clusterLister v3.ClusterLister, factory dial
 		}
 		return *u, nil
 	}
-
+	//2、构建远程service
 	return &RemoteService{
 		cluster:              cluster,
 		url:                  urlGetter,
 		clusterLister:        clusterLister,
-		factory:              factory,
+		factory:              factory, //拨号器的工厂方法
 		clusterContextGetter: clusterContextGetter,
 	}, nil
 }
@@ -139,7 +140,7 @@ func (r *RemoteService) getTransport() (http.RoundTripper, error) {
 	if r.transport != nil {
 		return r.transport()
 	}
-
+	//1、获取集群名称
 	newCluster, err := r.clusterLister.Get("", r.cluster.Name)
 	if err != nil {
 		return nil, err
@@ -151,7 +152,7 @@ func (r *RemoteService) getTransport() (http.RoundTripper, error) {
 	if r.httpTransport != nil && !r.cacertChanged(newCluster) {
 		return r.httpTransport, nil
 	}
-
+	//2、添加证书
 	transport := &http.Transport{}
 	if newCluster.Status.CACert != "" {
 		certBytes, err := base64.StdEncoding.DecodeString(newCluster.Status.CACert)
@@ -164,7 +165,7 @@ func (r *RemoteService) getTransport() (http.RoundTripper, error) {
 			RootCAs: certs,
 		}
 	}
-
+	//3、把Dialer放到transport中，等待使用
 	if r.factory != nil {
 		d, err := r.factory.ClusterDialer(newCluster.Name)
 		if err != nil {
@@ -199,13 +200,14 @@ func (r *RemoteService) Handler() http.Handler {
 	return r
 }
 
+// 对下游集群进行请求操作，最后调用的是httpProxy
 func (r *RemoteService) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	u, err := r.url()
 	if err != nil {
 		er.Error(rw, req, err)
 		return
 	}
-
+	// 1、解析请求的url、请求参数、协议，这里的方法是去掉return "/k8s/clusters/" + cluster.Name的前缀
 	u.Path = strings.TrimPrefix(req.URL.Path, prefix(r.cluster))
 	u.RawQuery = req.URL.RawQuery
 
@@ -217,14 +219,14 @@ func (r *RemoteService) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	} else {
 		req.URL.Scheme = "https"
 	}
-
+	//2、构建transport
 	req.URL.Host = req.Host
 	transport, err := r.getTransport()
 	if err != nil {
 		er.Error(rw, req, err)
 		return
 	}
-
+	//3、构建认证信息
 	if r.cluster.Spec.Internal && r.localAuth == "" {
 		req.Header.Del("Authorization")
 	} else {
@@ -233,6 +235,7 @@ func (r *RemoteService) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 			er.Error(rw, req, validation.Unauthorized)
 			return
 		}
+		// 获取token
 		token, err := r.getImpersonatorAccountToken(userInfo)
 		if err != nil && !strings.Contains(err.Error(), dialer2.ErrAgentDisconnected.Error()) {
 			er.Error(rw, req, fmt.Errorf("unable to create impersonator account: %w", err))
@@ -240,13 +243,13 @@ func (r *RemoteService) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		}
 		req.Header.Set("Authorization", "Bearer "+token)
 	}
-
+	//4、做连接升级的判断
 	if httpstream.IsUpgradeRequest(req) {
 		upgradeProxy := NewUpgradeProxy(&u, transport)
 		upgradeProxy.ServeHTTP(rw, req)
 		return
 	}
-
+	//5、本质来说，这里应该是http client 请求，这里使用了httputil的反向代理实现
 	httpProxy := proxy.NewUpgradeAwareHandler(&u, transport, true, false, er)
 	httpProxy.ServeHTTP(rw, req)
 }

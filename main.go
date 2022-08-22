@@ -210,7 +210,7 @@ func run(cli *cli.Context, cfg rancher.Options) error {
 	if cfg.AddLocal != "true" && cfg.AddLocal != "auto" {
 		logrus.Fatal("add-local flag must be set to 'true', see Rancher 2.5.0 release notes for more information")
 	}
-
+	//1、获取clientConfig 对象，用于访问local集群
 	embedded, clientConfig, err := k8s.GetConfig(ctx, cfg.K8sMode, kubeConfig)
 	if err != nil {
 		return err

@@ -57,6 +57,7 @@ type mcm struct {
 
 func buildScaledContext(ctx context.Context, wranglerContext *wrangler.Context, cfg *Options) (*config.ScaledContext,
 	*clustermanager.Manager, *mcmauthorizer.Authorizer, error) {
+	//1、构建scaledContext
 	scaledContext, err := config.NewScaledContext(*wranglerContext.RESTConfig, &config.ScaleContextOptions{
 		ControllerFactory: wranglerContext.ControllerFactory,
 	})
@@ -65,19 +66,19 @@ func buildScaledContext(ctx context.Context, wranglerContext *wrangler.Context, 
 	}
 
 	scaledContext.Wrangler = wranglerContext
-
+	//2、构建CatalogManager
 	scaledContext.CatalogManager = manager.New(scaledContext.Management, scaledContext.Project, scaledContext.Core)
-
+	//3、创建CRD资源
 	if err := managementcrds.Create(ctx, wranglerContext.RESTConfig); err != nil {
 		return nil, nil, nil, err
 	}
-
+	// 4、创建dialerFactory 工厂
 	dialerFactory, err := dialer.NewFactory(scaledContext, wranglerContext)
 	if err != nil {
 		return nil, nil, nil, err
 	}
 	scaledContext.Dialer = dialerFactory
-
+	//5、创建用户管理器
 	userManager, err := common.NewUserManager(scaledContext)
 	if err != nil {
 		return nil, nil, nil, err
@@ -85,15 +86,15 @@ func buildScaledContext(ctx context.Context, wranglerContext *wrangler.Context, 
 
 	scaledContext.UserManager = userManager
 	scaledContext.RunContext = ctx
-
+	//6、创建系统token
 	systemTokens := systemtokens.NewSystemTokensFromScale(scaledContext)
 	scaledContext.SystemTokens = systemTokens
-
+	//7、创建集群管理器，用于启动所有的controller
 	manager := clustermanager.NewManager(cfg.HTTPSListenPort, scaledContext, wranglerContext.ASL)
 
 	scaledContext.AccessControl = manager
 	scaledContext.ClientGetter = manager
-
+	//8、自定义授权控制器
 	authorizer := mcmauthorizer.NewAuthorizer(scaledContext)
 	wranglerContext.TunnelAuthorizer.Add(authorizer.AuthorizeTunnel)
 	scaledContext.PeerManager = wranglerContext.PeerManager
@@ -102,11 +103,12 @@ func buildScaledContext(ctx context.Context, wranglerContext *wrangler.Context, 
 }
 
 func newMCM(ctx context.Context, wranglerContext *wrangler.Context, cfg *Options) (*mcm, error) {
+	//1、构建scaledContext、clusterManager、tunnelAuthorizer
 	scaledContext, clusterManager, tunnelAuthorizer, err := buildScaledContext(ctx, wranglerContext, cfg)
 	if err != nil {
 		return nil, err
 	}
-
+	//2、初始化router
 	router, err := router(ctx, cfg.LocalClusterEnabled, tunnelAuthorizer, scaledContext, clusterManager)
 	if err != nil {
 		return nil, err
