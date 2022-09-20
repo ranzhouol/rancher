@@ -72,7 +72,7 @@ func SetUserStore(schema *types.Schema, mgmt *config.ScaledContext) {
 			return data, nil
 		},
 	}
-
+	// 这里指定了schema的store ，因此在handler的时候，首先掉用的是这个Create
 	schema.Store = t
 }
 

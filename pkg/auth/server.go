@@ -26,7 +26,7 @@ import (
 )
 
 type Server struct {
-	Authenticator steveauth.Middleware
+	Authenticator steveauth.Middleware //中间件
 	Management    func(http.Handler) http.Handler
 	scaledContext *config.ScaledContext
 }
@@ -50,22 +50,24 @@ func NewHeaderAuth() (*Server, error) {
 }
 
 func NewServer(ctx context.Context, cfg *rest.Config) (*Server, error) {
+	//1、构建NewScaledContext
 	sc, err := config.NewScaledContext(*cfg, nil)
 	if err != nil {
 		return nil, err
 	}
-
+	//2、构建用户管理
 	sc.UserManager, err = common.NewUserManagerNoBindings(sc)
 	if err != nil {
 		return nil, err
 	}
-
+	//3、获取sc-client，这里的client 用于访问k8s 的api server
 	sc.ClientGetter, err = proxy.NewClientGetterFromConfig(*cfg)
 	if err != nil {
 		return nil, err
 	}
-
+	//4、构建验证器
 	authenticator := requests.NewAuthenticator(ctx, clusterrouter.GetClusterID, sc)
+	//5、构建授权管理器
 	authManagement, err := newAPIManagement(ctx, sc)
 	if err != nil {
 		return nil, err
@@ -79,6 +81,7 @@ func NewServer(ctx context.Context, cfg *rest.Config) (*Server, error) {
 }
 
 func newAPIManagement(ctx context.Context, scaledContext *config.ScaledContext) (steveauth.Middleware, error) {
+	// 1、构建私有接口处理器
 	privateAPI, err := newPrivateAPI(ctx, scaledContext)
 	if err != nil {
 		return nil, err
@@ -104,11 +107,12 @@ func newAPIManagement(ctx context.Context, scaledContext *config.ScaledContext) 
 }
 
 func newPrivateAPI(ctx context.Context, scaledContext *config.ScaledContext) (*mux.Router, error) {
+	//1、token 的处理方式：包括CRUD logout 5个handler 使用的是norman APi ，CRD的初始化和User 一起，没有用到store
 	tokenAPI, err := tokens.NewAPIHandler(ctx, scaledContext, norman.ConfigureAPIUI)
 	if err != nil {
 		return nil, err
 	}
-
+	//2、用户的处理方式：内部使用的依然是norman APi，但是store调用比较诡异，没有弄明白
 	otherAPIs, err := api.NewNormanServer(ctx, clusterrouter.GetClusterID, scaledContext)
 	if err != nil {
 		return nil, err

@@ -5,6 +5,7 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"fmt"
+	"github.com/sirupsen/logrus"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -152,10 +153,11 @@ func (r *RemoteService) getTransport() (http.RoundTripper, error) {
 	if r.httpTransport != nil && !r.cacertChanged(newCluster) {
 		return r.httpTransport, nil
 	}
-	//2、添加证书
+	//2、添加证书，证书集群状态中获取
 	transport := &http.Transport{}
 	if newCluster.Status.CACert != "" {
 		certBytes, err := base64.StdEncoding.DecodeString(newCluster.Status.CACert)
+		logrus.Infof(" getTransport  certs  URL %s ", newCluster.Status.CACert)
 		if err != nil {
 			return nil, err
 		}

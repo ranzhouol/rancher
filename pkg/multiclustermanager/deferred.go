@@ -3,6 +3,7 @@ package multiclustermanager
 import (
 	"context"
 	"fmt"
+	"github.com/sirupsen/logrus"
 	"net"
 	"net/http"
 	"sync"
@@ -70,7 +71,8 @@ func (s *DeferredServer) Start(ctx context.Context) error {
 		mcm *mcm
 		err error
 	)
-
+	//猜测这里是自定义的事物操作，为了保证各个操作的一致性
+	logrus.Infof("s.wrangler.StartWithTransaction ")
 	err = s.wrangler.StartWithTransaction(ctx, func(ctx context.Context) error {
 		mcm, err = newMCM(ctx, s.wrangler, s.opts)
 		if err != nil {

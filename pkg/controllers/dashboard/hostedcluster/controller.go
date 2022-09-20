@@ -3,6 +3,7 @@ package hostedcluster
 import (
 	"context"
 	"fmt"
+	"github.com/sirupsen/logrus"
 	"os"
 	"strings"
 
@@ -65,6 +66,7 @@ type handler struct {
 }
 
 func Register(ctx context.Context, wContext *wrangler.Context) {
+	logrus.Infof("hostedcluster Register ==========>")
 	h := &handler{
 		manager:      wContext.SystemChartsManager,
 		apps:         wContext.Project.App(),

@@ -2,7 +2,12 @@ package multiclustermanager
 
 import (
 	"context"
+	"github.com/rancher/apiserver/pkg/urlbuilder"
+	"github.com/rancher/rancher/pkg/karmadaproxy"
+	"github.com/sirupsen/logrus"
+	"k8s.io/apimachinery/pkg/util/proxy"
 	"net/http"
+	"strings"
 
 	"github.com/gorilla/mux"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -36,21 +41,34 @@ import (
 	"github.com/rancher/steve/pkg/auth"
 )
 
+var (
+	er = &errorResponder{}
+)
+
+type errorResponder struct {
+}
+
+func (e *errorResponder) Error(w http.ResponseWriter, req *http.Request, err error) {
+	w.WriteHeader(http.StatusInternalServerError)
+	w.Write([]byte(err.Error()))
+}
+
 func router(ctx context.Context, localClusterEnabled bool, tunnelAuthorizer *mcmauthorizer.Authorizer, scaledContext *config.ScaledContext, clusterManager *clustermanager.Manager) (func(http.Handler) http.Handler, error) {
+
 	var (
-		// 构建代理处理器
-		k8sProxy = k8sProxyPkg.New(scaledContext, scaledContext.Dialer, clusterManager)
-		// 这里是web client的处理方式，处理的形式和remotedialer一样，主要是接收链接请求，之后生成session、建立Tunnel
+		k8sProxy             = k8sProxyPkg.New(scaledContext, scaledContext.Dialer, clusterManager)
 		connectHandler       = scaledContext.Dialer.(*rancherdialer.Factory).TunnelServer
 		connectConfigHandler = rkenodeconfigserver.Handler(tunnelAuthorizer, scaledContext)
 		clusterImport        = clusterregistrationtokens.ClusterImport{Clusters: scaledContext.Management.Clusters("")}
+		karmadaProxy         = karmadaproxy.NewProxy()
 	)
 
+	//1、创建token 处理函数，使用的是norman的api接口方式
 	tokenAPI, err := tokens.NewAPIHandler(ctx, scaledContext, norman.ConfigureAPIUI)
 	if err != nil {
 		return nil, err
 	}
-
+	//2、公共API handler，使用的是norman的api接口方式
 	publicAPI, err := publicapi.NewHandler(ctx, scaledContext, norman.ConfigureAPIUI)
 	if err != nil {
 		return nil, err
@@ -73,6 +91,16 @@ func router(ctx context.Context, localClusterEnabled bool, tunnelAuthorizer *mcm
 	// Unauthenticated routes
 	unauthed := mux.NewRouter()
 	unauthed.UseEncodedPath()
+	unauthed.Use(urlbuilder.RedirectRewrite)
+
+	matchV1Karmada := func(r *http.Request, match *mux.RouteMatch) bool {
+		if strings.HasPrefix(r.URL.Path, "/cluster.karmada.io") || strings.HasPrefix(r.URL.Path, "/policy.karmada.io") {
+			logrus.Infof(" multiclustermanager  matchV1Karmada  URL %s ", r.URL.Path)
+			match.Vars = map[string]string{"name": "v1/karmada"}
+			return true
+		}
+		return false
+	}
 
 	unauthed.Path("/").MatcherFunc(parse.MatchNotBrowser).Handler(managementAPI)
 	unauthed.Handle("/v3/connect/config", connectConfigHandler)
@@ -91,6 +119,8 @@ func router(ctx context.Context, localClusterEnabled bool, tunnelAuthorizer *mcm
 	unauthed.PathPrefix("/v1-{prefix}-release/release").Handler(channelserver)
 	unauthed.PathPrefix("/v1-saml").Handler(saml.AuthHandler())
 	unauthed.PathPrefix("/v3-public").Handler(publicAPI)
+	unauthed.HandleFunc("/test", joinClusterName)
+	unauthed.MatcherFunc(matchV1Karmada).HandlerFunc(karmadaproxy.ProxyRequestHandler(karmadaProxy))
 
 	// Authenticated routes
 	authed := mux.NewRouter()
@@ -120,7 +150,24 @@ func router(ctx context.Context, localClusterEnabled bool, tunnelAuthorizer *mcm
 	}, nil
 }
 
+func karmadaHandle(rw http.ResponseWriter, req *http.Request) {
+	logrus.Infof(" multiclustermanager URL %s ", req.URL)
+	logrus.Infof(" multiclustermanager URL %s ", req.URL.Host)
+	logrus.Infof(" multiclustermanager req.Header%s ", req.Header.Get("Authorization"))
+
+	strings.ReplaceAll(req.URL.Host, "%!F(MISSING)", "")
+	logrus.Infof(" multiclustermanager URL %s ", req.URL)
+	logrus.Infof(" multiclustermanager URL %s ", req.URL.Host)
+	httpProxy := proxy.NewUpgradeAwareHandler(req.URL, nil, true, false, er)
+	httpProxy.ServeHTTP(rw, req)
+}
+
 // onlyGet will match only GET but will not return a 405 like route.Methods and instead just not match
 func onlyGet(req *http.Request, m *mux.RouteMatch) bool {
 	return req.Method == http.MethodGet
+}
+func joinClusterName(writer http.ResponseWriter, request *http.Request) {
+	// 根据请求body创建一个json解析器实例
+	logrus.Infof(" joinClusterName URL %s ", request.URL)
+	logrus.Infof(" joinClusterName URL %s ", request.URL.Host)
 }

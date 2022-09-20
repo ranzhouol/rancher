@@ -37,7 +37,7 @@ func (a ActionHandler) GenerateKubeconfigActionHandler(actionName string, action
 	)
 
 	endpointEnabled := cluster.LocalClusterAuthEndpoint != nil && cluster.LocalClusterAuthEndpoint.Enabled
-
+	//3、获取tokenKey
 	generateToken := strings.EqualFold(settings.KubeconfigGenerateToken.Get(), "true")
 	if generateToken {
 		// generate token and place it in kubeconfig, token doesn't expire

@@ -66,9 +66,9 @@ func NewAKSHandler(scaledContext *config.ScaledContext) http.Handler {
 
 func (h *handler) ServeHTTP(writer http.ResponseWriter, req *http.Request) {
 	writer.Header().Set("Content-Type", "application/json")
-
+	//1、获取resourceType （资源类型）
 	resourceType := mux.Vars(req)["resource"]
-
+	//2、请求方法和Cred证书验证
 	if resourceType == "aksCheckCredentials" {
 		if req.Method != http.MethodPost {
 			handleErr(writer, http.StatusMethodNotAllowed, fmt.Errorf("use POST for this endpoint"))
@@ -152,15 +152,16 @@ func (h *handler) ServeHTTP(writer http.ResponseWriter, req *http.Request) {
 
 func (h *handler) checkCredentials(req *http.Request) (int, error) {
 	cred := &Capabilities{}
+	//1、读取req.Body
 	raw, err := ioutil.ReadAll(req.Body)
 	if err != nil {
 		return http.StatusBadRequest, fmt.Errorf("cannot read request body: %v", err)
 	}
-
+	//2、解析成cred对象
 	if err = json.Unmarshal(raw, &cred); err != nil {
 		return http.StatusBadRequest, fmt.Errorf("cannot parse request body: %v", err)
 	}
-
+	//3、验证基本参数
 	if cred.SubscriptionID == "" {
 		return http.StatusBadRequest, fmt.Errorf("must provide subscriptionId")
 	}
@@ -172,6 +173,7 @@ func (h *handler) checkCredentials(req *http.Request) (int, error) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
+	//4、获取基本的租户编号
 	if cred.TenantID == "" {
 		cred.TenantID, err = azureutil.FindTenantID(ctx, azure.PublicCloud, cred.SubscriptionID)
 		if err != nil {
@@ -184,6 +186,7 @@ func (h *handler) checkCredentials(req *http.Request) (int, error) {
 	if cred.AuthBaseURL == "" {
 		cred.AuthBaseURL = azure.PublicCloud.ActiveDirectoryEndpoint
 	}
+	//5、构建NewSubscriptionServiceClient
 	client, err := NewSubscriptionServiceClient(cred)
 	if err != nil {
 		return http.StatusUnauthorized, fmt.Errorf("invalid credentials")

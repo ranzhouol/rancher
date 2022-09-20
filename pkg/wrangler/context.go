@@ -148,6 +148,7 @@ func (w *Context) OnLeader(f func(ctx context.Context) error) {
 }
 
 func (w *Context) StartWithTransaction(ctx context.Context, f func(context.Context) error) (err error) {
+	//1、构建transaction
 	transaction := controller.NewHandlerTransaction(ctx)
 	if err := f(transaction); err != nil {
 		transaction.Rollback()
@@ -190,8 +191,9 @@ func enableProtobuf(cfg *rest.Config) *rest.Config {
 	return cpy
 }
 
+//这里是构建资源的controller factory的地方，目的是为了实现资源的controller
 func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restConfig *rest.Config) (*Context, error) {
-	//1、构建controllerFactory
+	//1、构建controllerFactory，这里的Scheme（资源注册表是k8s的）
 	controllerFactory, err := controller.NewSharedControllerFactoryFromConfig(enableProtobuf(restConfig), Scheme)
 	if err != nil {
 		return nil, err
@@ -200,8 +202,9 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 	opts := &generic.FactoryOptions{
 		SharedControllerFactory: controllerFactory,
 	}
-
+	//2、构建steveControllers
 	steveControllers, err := server.NewController(restConfig, opts)
+
 	if err != nil {
 		return nil, err
 	}
@@ -273,7 +276,7 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 	if err != nil {
 		return nil, err
 	}
-
+	//3、构建访问控制
 	asl := accesscontrol.NewAccessStore(ctx, true, steveControllers.RBAC)
 
 	cg, err := client.NewFactory(restConfig, false)
@@ -299,7 +302,7 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 		CachedDiscovery: cache,
 		RESTMapper:      restMapper,
 	}
-	//2、构建systemCharts
+	//4、构建systemCharts
 	systemCharts, err := system.NewManager(ctx, restClientGetter, content, helmop, steveControllers.Core.Pod(),
 		mgmt.Management().V3().Setting(), ctlg.Catalog().V1().ClusterRepo())
 	if err != nil {
@@ -323,13 +326,13 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 	})
 	// 构建Context
 	return &Context{
-		Controllers:             steveControllers,
-		Apply:                   apply,
+		Controllers:             steveControllers, //steveControllers
+		Apply:                   apply,            //Apply
 		SharedControllerFactory: controllerFactory,
 		Dynamic:                 dynamic.New(steveControllers.K8s.Discovery()),
 		CAPI:                    capi.Cluster().V1alpha4(),
 		RKE:                     rke.Rke().V1(),
-		Mgmt:                    mgmt.Management().V3(),
+		Mgmt:                    mgmt.Management().V3(), //管理相关的资源controller 初始化，资源的CRUD 都可以通过Mgmt完成
 		Apps:                    apps.Apps().V1(),
 		Admission:               adminReg.Admissionregistration().V1(),
 		Project:                 project.Project().V3(),

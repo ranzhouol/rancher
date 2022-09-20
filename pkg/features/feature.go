@@ -124,8 +124,10 @@ type Feature struct {
 }
 
 // InitializeFeatures updates feature default if given valid --features flag and creates/updates necessary features in k8s
+// 初始化对应的Features
 func InitializeFeatures(featuresClient managementv3.FeatureClient, featureArgs string) {
 	// applies any default values assigned in --features flag to feature map
+	//1、默认参数赋值
 	if err := applyArgumentDefaults(featureArgs); err != nil {
 		logrus.Errorf("failed to apply feature args: %v", err)
 	}
@@ -135,6 +137,7 @@ func InitializeFeatures(featuresClient managementv3.FeatureClient, featureArgs s
 	}
 
 	// creates any features in map that do not exist, updates features with new default value
+	//2、对所有的features进行赋值操作
 	for key, f := range features {
 		featureState, err := featuresClient.Get(key, metav1.GetOptions{})
 		if err != nil {
@@ -227,7 +230,7 @@ func applyArgumentDefaults(featureArgs string) error {
 	if featureArgs == "" {
 		return nil
 	}
-
+	// 1、对参数进行分割
 	formattingError := fmt.Errorf("feature argument [%s] should be of the form \"features=feature1=bool,feature2=bool\"", featureArgs)
 	args := strings.Split(featureArgs, ",")
 

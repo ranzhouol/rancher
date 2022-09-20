@@ -60,7 +60,7 @@ func (s *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 	if err != nil || data == nil {
 		return nil, err
 	}
-
+	//1、获取用户的ns
 	ns := getNamespace(user)
 	_, err = s.nsClient.Get(ns, metav1.GetOptions{})
 	if err != nil {

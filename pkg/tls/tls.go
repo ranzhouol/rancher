@@ -63,7 +63,7 @@ func ListenAndServe(ctx context.Context, restConfig *rest.Config, handler http.H
 	if err != nil {
 		return err
 	}
-
+	//1、构建listener 的opts
 	if httpsPort != 0 {
 		opts, err = SetupListener(core.Core().V1().Secret(), acmeDomains, noCACerts)
 		if err != nil {
@@ -84,6 +84,7 @@ func ListenAndServe(ctx context.Context, restConfig *rest.Config, handler http.H
 	// Try listen and serve over if there is an already exist error which comes from
 	// creating the ca. Rancher will hit this error during HA startup as all servers
 	// will race to create the ca secret.
+	//2、启动dynamiclistener 函数,ExponentialBackoff会尝试启动，直到返回true
 	err = wait.ExponentialBackoff(backoff, func() (bool, error) {
 		if err := server.ListenAndServe(ctx, httpsPort, httpPort, handler, opts); err != nil {
 			if apierrors.IsAlreadyExists(err) {
@@ -110,6 +111,7 @@ func ListenAndServe(ctx context.Context, restConfig *rest.Config, handler http.H
 		CertNamespace: namespace.System,
 		CertName:      "tls-rancher-internal",
 	}
+	//6、获取clusterIP和hostIP
 	clusterIP, err := getClusterIP(core.Core().V1().Service())
 	if err != nil {
 		return err
@@ -127,7 +129,7 @@ func ListenAndServe(ctx context.Context, restConfig *rest.Config, handler http.H
 			SANs: hostIPs,
 		}
 	}
-
+	// 3、启动内部的server ListenAndServe for fleet
 	internalAPICtx := context.WithValue(ctx, InternalAPI, true)
 	err = wait.ExponentialBackoff(backoff, func() (bool, error) {
 		if err := server.ListenAndServe(internalAPICtx, internalPort, 0, handler, serverOptions); err != nil {
@@ -190,6 +192,7 @@ func migrateConfig(ctx context.Context, restConfig *rest.Config, opts *server.Li
 }
 
 func SetupListener(secrets corev1controllers.SecretController, acmeDomains []string, noCACerts bool) (*server.ListenOpts, error) {
+	//1、加载dynamiclisten 相关配置
 	caForAgent, noCACerts, opts, err := readConfig(secrets, acmeDomains, noCACerts)
 	if err != nil {
 		return nil, err
@@ -198,6 +201,7 @@ func SetupListener(secrets corev1controllers.SecretController, acmeDomains []str
 	if noCACerts {
 		caForAgent = ""
 	} else if caForAgent == "" {
+		//2、从k8s中获取证书
 		caCert, caKey, err := kubernetes.LoadOrGenCA(secrets, opts.CANamespace, opts.CAName)
 		if err != nil {
 			return nil, err
@@ -206,7 +210,7 @@ func SetupListener(secrets corev1controllers.SecretController, acmeDomains []str
 		opts.CA = caCert
 		opts.CAKey = caKey
 	}
-
+	//3、全局设置中配置证书
 	caForAgent = strings.TrimSpace(caForAgent)
 	if settings.CACerts.Get() != caForAgent {
 		if err := settings.CACerts.Set(caForAgent); err != nil {

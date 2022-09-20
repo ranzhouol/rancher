@@ -156,6 +156,7 @@ func (m *Manager) updateToken(token *v3.Token) (*v3.Token, error) {
 }
 
 func (m *Manager) getToken(tokenAuthValue string) (*v3.Token, int, error) {
+	//1、获取tokenName tokenKey
 	tokenName, tokenKey := SplitTokenParts(tokenAuthValue)
 
 	lookupUsingClient := false
@@ -267,10 +268,11 @@ func (m *Manager) getTokenByID(tokenAuthValue string, tokenID string) (v3.Token,
 	return *token, 0, nil
 }
 
+// token 创建函数
 func (m *Manager) deriveToken(request *types.APIContext) error {
 
 	r := request.Request
-
+	//1、获取token 的参数值
 	tokenAuthValue := GetTokenAuthFromRequest(r)
 	if tokenAuthValue == "" {
 		// no cookie or auth header, cannot authenticate
@@ -289,6 +291,7 @@ func (m *Manager) deriveToken(request *types.APIContext) error {
 	}
 
 	// create derived token
+	// 2、创建token
 	token, unhashedTokenKey, status, err := m.createDerivedToken(jsonInput, tokenAuthValue)
 	if err != nil {
 		logrus.Errorf("deriveToken failed with error: %v", err)
@@ -351,7 +354,7 @@ func (m *Manager) listTokens(request *types.APIContext) error {
 func (m *Manager) logout(actionName string, action *types.Action, request *types.APIContext) error {
 	r := request.Request
 	w := request.Response
-
+	//1、获取token的信息
 	tokenAuthValue := GetTokenAuthFromRequest(r)
 	if tokenAuthValue == "" {
 		// no cookie or auth header, cannot authenticate

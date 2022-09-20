@@ -40,6 +40,7 @@ func addLocalCluster(embedded bool, wrangler *wrangler.Context) error {
 	}
 
 	var err error
+	//1、创建 cluster
 	c, err = wrangler.Mgmt.Cluster().Create(c)
 	if apierrors.IsAlreadyExists(err) {
 		c, err = wrangler.Mgmt.Cluster().Get("local", metav1.GetOptions{})
@@ -50,7 +51,7 @@ func addLocalCluster(embedded bool, wrangler *wrangler.Context) error {
 	if err != nil {
 		return err
 	}
-
+	// 2、创建namespace
 	_, err = wrangler.Core.Namespace().Create(&corev1.Namespace{
 		ObjectMeta: v1.ObjectMeta{
 			Name: "local",

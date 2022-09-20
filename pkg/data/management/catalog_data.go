@@ -149,7 +149,7 @@ func syncCatalogs(management *config.ManagementContext) error {
 				return err
 			}
 			desiredDefaultURL := systemLibraryURL
-			desiredDefaultBranch := ""
+			desiredDefaultBranch := "dev"
 			if devMode := os.Getenv("CATTLE_DEV_MODE"); devMode != "" {
 				desiredDefaultBranch = "dev"
 			}
