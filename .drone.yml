@@ -1017,10 +1017,10 @@ steps:
     - push
     - tag
 
-- name: build-chart
+- name: build-
   image: rancher/dapper:v0.5.8
   commands:
-  - dapper chart/ci
+  - dapper /ci
   privileged: true
   volumes:
   - name: docker
@@ -1030,7 +1030,7 @@ steps:
     - push
     - tag
 
-- name: chart-publish
+- name: -publish
   image: plugins/gcs
   settings:
     acl:

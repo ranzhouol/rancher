@@ -211,6 +211,9 @@ func run(cli *cli.Context, cfg rancher.Options) error {
 		logrus.Fatal("add-local flag must be set to 'true', see Rancher 2.5.0 release notes for more information")
 	}
 	//1、获取clientConfig 对象，用于访问local集群
+	kubeConfig := "D:\\code\\go\\src\\github.com\\Momeaking\\rancher\\bin\\rke.yaml"
+	//kubeConfig := "D:\\code\\go\\src\\github.com\\Momeaking\\rancher\\bin\\admin.conf"
+	cfg.K8sMode = "external"
 	embedded, clientConfig, err := k8s.GetConfig(ctx, cfg.K8sMode, kubeConfig)
 	if err != nil {
 		return err
@@ -218,7 +221,7 @@ func run(cli *cli.Context, cfg rancher.Options) error {
 	cfg.Embedded = embedded
 
 	os.Unsetenv("KUBECONFIG")
-
+	//2、构建rancher 传入上下文、本地的clientConfig 、配置选项
 	server, err := rancher.New(ctx, clientConfig, &cfg)
 	if err != nil {
 		return err

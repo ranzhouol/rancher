@@ -59,16 +59,16 @@ const encryptionConfigUpdate = "provisioner.cattle.io/encrypt-migrated"
 
 type Options struct {
 	ACMEDomains       cli.StringSlice
-	AddLocal          string
+	AddLocal          string // AddLocal
 	Embedded          bool
 	BindHost          string
 	HTTPListenPort    int
 	HTTPSListenPort   int
-	K8sMode           string
+	K8sMode           string // k8s mode
 	Debug             bool
 	Trace             bool
 	NoCACerts         bool
-	AuditLogPath      string
+	AuditLogPath      string // 日志相关
 	AuditLogMaxage    int
 	AuditLogMaxsize   int
 	AuditLogMaxbackup int
@@ -78,7 +78,7 @@ type Options struct {
 }
 
 type Rancher struct {
-	Auth     steveauth.Middleware
+	Auth     steveauth.Middleware //steveauth
 	Handler  http.Handler
 	Wrangler *wrangler.Context
 	Steve    *steveserver.Server
@@ -107,20 +107,21 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		return nil, err
 	}
 
-	// Run the encryption migration before any controllers run otherwise the fields will be dropped
+	// Run the encryption migration before any controllers run otherwise the fields will be dropped/
+	// 第一次启动的时候并不起作用
 	if err := migrateEncryptionConfig(ctx, restConfig); err != nil {
 		return nil, err
 	}
-	// 2、构建wranglerContext，启动websocket server 重点
+	// 2、构建wranglerContext，启动websocket server 重点，管理平台核心功能
 	wranglerContext, err := wrangler.NewContext(ctx, clientConfg, restConfig)
 	if err != nil {
 		return nil, err
 	}
-	//3、页面早期数据获取，获取fleet-local 和cattle-system 的命名空间，如果没有则重新创建
+	//3、页面早期数据获取，获取fleet-local 和cattle-system 的命名空间，如果没有则重新创建，在host集群中
 	if err := dashboarddata.EarlyData(ctx, wranglerContext.K8s); err != nil {
 		return nil, err
 	}
-	//4、构建rancher service 和对应的endpoint 和webhook
+	//4、判断是否为嵌入式，用于docker 启动 构建rancher service 和对应的endpoint 和webhook
 	if opts.Embedded {
 		if err := setupRancherService(ctx, restConfig, opts.HTTPSListenPort); err != nil {
 			return nil, err
@@ -131,7 +132,7 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 	}
 	//5、构建MultiClusterManager 重点
 	wranglerContext.MultiClusterManager = newMCM(wranglerContext, opts)
-
+	logrus.Infof("crds.CreateFeatureCRD ")
 	// Initialize Features as early as possible
 	//6、初始化所有的FeatureCRD 和对CRD资源进行补全操作
 	if err := crds.CreateFeatureCRD(ctx, restConfig); err != nil {
@@ -142,21 +143,23 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		return nil, fmt.Errorf("migrating features: %w", err)
 	}
 	features.InitializeFeatures(wranglerContext.Mgmt.Feature(), opts.Features)
-	// 7、注册podsecuritypolicytemplate，kontainerdriver，managementauth 用于wrangler启动的时候controller直接工作
+
+	// 7、注册podsecuritypolicytemplate，kontainerdriver（容器驱动），managementauth 用于wrangler启动的时候controller直接工作，用于k8s资源的CRUD操作
 	podsecuritypolicytemplate.RegisterIndexers(wranglerContext)
 	kontainerdriver.RegisterIndexers(wranglerContext)
 	managementauth.RegisterWranglerIndexers(wranglerContext)
-	//8、构建webhook的crd
+	//8、构建webhook的crd，绑定CRD和fleet
 	if err := crds.Create(ctx, restConfig); err != nil {
 		return nil, err
 	}
-
+	logrus.Infof("crds.Create finish ")
 	if features.MCM.Enabled() && !features.Fleet.Enabled() {
 		logrus.Info("fleet can't be turned off when MCM is enabled. Turning on fleet feature")
 		if err := features.SetFeature(wranglerContext.Mgmt.Feature(), features.Fleet.Name(), true); err != nil {
 			return nil, err
 		}
 	}
+	logrus.Infof("features.Auth.Enabled() :", features.Auth.Enabled())
 	// 9、判断是否开启多租户功能
 	if features.Auth.Enabled() {
 		authServer, err = auth.NewServer(ctx, restConfig)
@@ -169,10 +172,10 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 			return nil, err
 		}
 	}
-	//10、构建steve Kubernetes API Translator
+	//10、构建steve Kubernetes API Translator,这里并没有构建steveserver.router
 	steve, err := steveserver.New(ctx, restConfig, &steveserver.Options{
 		ServerVersion:   settings.ServerVersion.Get(),
-		Controllers:     wranglerContext.Controllers,
+		Controllers:     wranglerContext.Controllers, //一样的
 		AccessSetLookup: wranglerContext.ASL,
 		AuthMiddleware:  steveauth.ExistingContext,
 		Next:            ui.New(wranglerContext.Mgmt.Preference().Cache(), wranglerContext.Mgmt.ClusterRegistrationToken().Cache()),
@@ -197,14 +200,14 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 	if err != nil {
 		return nil, err
 	}
-
+	// 12、构建日志相关，NewAuditLogMiddleware通过拦截器的方式记录所有的请求日志,类似java中的aop请求拦截
 	auditLogWriter := audit.NewLogWriter(opts.AuditLogPath, opts.AuditLevel, opts.AuditLogMaxage, opts.AuditLogMaxbackup, opts.AuditLogMaxsize)
 	auditFilter, err := audit.NewAuditLogMiddleware(auditLogWriter)
 	if err != nil {
 		return nil, err
 	}
 	aggregationMiddleware := aggregation.NewMiddleware(ctx, wranglerContext.Mgmt.APIService(), wranglerContext.TunnelServer)
-	// 12、构建rancher
+	// 13、构建rancher
 	return &Rancher{
 		Auth: authServer.Authenticator.Chain(
 			auditFilter),
@@ -220,7 +223,7 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 			authServer.Management,
 			additionalAPI,
 			requests.NewRequireAuthenticatedFilter("/v1/", "/v1/management.cattle.io.setting"),
-		}.Handler(steve),
+		}.Handler(steve), //Handler 方式是封装的middlewares 用于加载http的middlewares 这里返回的是一个http.Handler，需要注意的是调佣先后
 		Wrangler:   wranglerContext,
 		Steve:      steve,
 		auditLog:   auditLogWriter,
@@ -234,64 +237,70 @@ func (r *Rancher) Start(ctx context.Context) error {
 	if err := dashboardapi.Register(ctx, r.Wrangler); err != nil {
 		return err
 	}
-
+	logrus.Infof("dashboardapi.Register ")
 	if err := steveapi.Setup(ctx, r.Steve, r.Wrangler); err != nil {
 		return err
 	}
-	// 2、启动Start，之后controller 可以监听不同的资源变化，后面调用DeferredServer
+	// 2、启动Start，之后controller 可以监听不同的资源变化，后面调用DeferredServer，核心方法1
+	logrus.Infof("steveapi.Setup ")
 	if features.MCM.Enabled() {
 		if err := r.Wrangler.MultiClusterManager.Start(ctx); err != nil {
 			return err
 		}
 	}
-
+	logrus.Infof("Wrangler.OnLeader ")
+	// 获取领导权，一直执行直到成功返回true  核心方法2
 	r.Wrangler.OnLeader(func(ctx context.Context) error {
+		//3、添加dashboard 数据，启动数据的添加，主要是用户数据、角色数据、仓库数据
 		if err := dashboarddata.Add(ctx, r.Wrangler, localClusterEnabled(r.opts), r.opts.AddLocal == "false", r.opts.Embedded); err != nil {
 			return err
 		}
-
+		//4、注册相关的资源监听
 		if err := r.Wrangler.StartWithTransaction(ctx, func(ctx context.Context) error { return dashboard.Register(ctx, r.Wrangler, r.opts.Embedded) }); err != nil {
 			return err
 		}
-
+		// 5、清除之前的所有的用户token
 		if err := forceUpgradeLogout(r.Wrangler.Core.ConfigMap(), r.Wrangler.Mgmt.Token(), "v2.6.0"); err != nil {
 			return err
 		}
-
+		//6、集群级别的初始化操作
 		if err := forceSystemAndDefaultProjectCreation(r.Wrangler.Core.ConfigMap(), r.Wrangler.Mgmt.Cluster()); err != nil {
 			return err
 		}
-
+		//7、 更新controller 的configmap
 		if features.MCM.Enabled() {
 			if err := forceSystemNamespaceAssignment(r.Wrangler.Core.ConfigMap(), r.Wrangler.Mgmt.Project()); err != nil {
 				return err
 			}
 		}
-
+		//8、确保cattle-system 和 fleet-default 都有秘钥
 		return copyCAAdditionalSecret(r.Wrangler.Core.Secret())
 	})
-
+	//9、启动authServer
 	if err := r.authServer.Start(ctx, false); err != nil {
 		return err
 	}
 
 	r.Wrangler.OnLeader(r.authServer.OnLeader)
 	r.auditLog.Start(ctx)
-	// 3、启动Wrangler
+	// 10、启动Wrangler
 	return r.Wrangler.Start(ctx)
 }
 
 func (r *Rancher) ListenAndServe(ctx context.Context) error {
 	//1、核心服务启动
+	logrus.Infof("ListenAndServe ")
 	if err := r.Start(ctx); err != nil {
 		return err
 	}
 
 	r.Wrangler.MultiClusterManager.Wait(ctx)
+	logrus.Infof("MultiClusterManager ")
 	// 2、监听Secret的变化
 	r.startAggregation(ctx)
 	go r.Steve.StartAggregation(ctx)
 	//3、启动ListenAndServe，把所有的handler 都放到http server 中
+	logrus.Infof("StartAggregation ")
 	if err := tls.ListenAndServe(ctx, r.Wrangler.RESTConfig,
 		r.Auth(r.Handler),
 		r.opts.BindHost,
@@ -307,6 +316,7 @@ func (r *Rancher) ListenAndServe(ctx context.Context) error {
 }
 
 func (r *Rancher) startAggregation(ctx context.Context) {
+
 	aggregation2.Watch(ctx, r.Wrangler.Core.Secret(), namespace.System, "stv-aggregation", r.Handler)
 }
 
@@ -521,9 +531,11 @@ func migrateEncryptionConfig(ctx context.Context, restConfig *rest.Config) error
 	if err != nil {
 		return err
 	}
+	//1、构建集群、资源的clients
 	clusterDynamicClient := dynamicClient.Resource(mgmntv3.ClusterGroupVersionResource)
-
+	//2、查询所有的集群
 	clusters, err := clusterDynamicClient.List(ctx, metav1.ListOptions{})
+	logrus.Infof("clusterDynamicClient clusters ", clusters)
 	if err != nil {
 		if !k8serror.IsNotFound(err) {
 			return err

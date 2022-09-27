@@ -2,6 +2,10 @@ package multiclustermanager
 
 import (
 	"context"
+	"fmt"
+	apiv1 "k8s.io/api/core/v1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/clientcmd"
 	"net/http"
 	"os"
 	"sync"
@@ -17,10 +21,8 @@ import (
 	managementController "github.com/rancher/rancher/pkg/controllers/management"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterupstreamrefresher"
 	managementcrds "github.com/rancher/rancher/pkg/crds/management"
-	"github.com/rancher/rancher/pkg/cron"
 	managementdata "github.com/rancher/rancher/pkg/data/management"
 	"github.com/rancher/rancher/pkg/dialer"
-	"github.com/rancher/rancher/pkg/jailer"
 	"github.com/rancher/rancher/pkg/metrics"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/systemtokens"
@@ -113,6 +115,28 @@ func newMCM(ctx context.Context, wranglerContext *wrangler.Context, cfg *Options
 	if err != nil {
 		return nil, err
 	}
+	//karmada 整合
+	karmadaSecret, err := scaledContext.Core.Secrets("karmada-system").Get("karmada-kubeconfig", metav1.GetOptions{})
+	logrus.Infof("Rancher karmadaSecret %s", karmadaSecret.Data["kubeconfig"])
+	logrus.Infof("Rancher karmadaSecret %s", karmadaSecret.Data["kubeconfig"])
+
+	config, err := clientcmd.RESTConfigFromKubeConfig(karmadaSecret.Data["kubeconfig"])
+
+	//client, err := proxy.NewClientGetterFromConfig(*config)
+
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		panic(err)
+	}
+
+	deploymentsClient := clientset.AppsV1().Deployments(apiv1.NamespaceDefault)
+	list, err := deploymentsClient.List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		panic(err)
+	}
+	for _, d := range list.Items {
+		fmt.Printf(" * %s (%d replicas)\n", d.Name, *d.Spec.Replicas)
+	}
 
 	if os.Getenv("CATTLE_PROMETHEUS_METRICS") == "true" {
 		metrics.Register(ctx, scaledContext)
@@ -176,16 +200,16 @@ func (m *mcm) Start(ctx context.Context) error {
 		management *config.ManagementContext
 	)
 
-	if dm := os.Getenv("CATTLE_DEV_MODE"); dm == "" {
-		if err := jailer.CreateJail("driver-jail"); err != nil {
-			return err
-		}
-
-		if err := cron.StartJailSyncCron(m.ScaledContext); err != nil {
-			return err
-		}
-	}
-
+	//if dm := os.Getenv("CATTLE_DEV_MODE"); dm == "" {
+	//	if err := jailer.CreateJail("driver-jail"); err != nil {
+	//		return err
+	//	}
+	//
+	//	if err := cron.StartJailSyncCron(m.ScaledContext); err != nil {
+	//		return err
+	//	}
+	//}
+	//1、每隔5s执行依次下面的func 知道成功
 	m.wranglerContext.OnLeader(func(ctx context.Context) error {
 		err := m.wranglerContext.StartWithTransaction(ctx, func(ctx context.Context) error {
 			var (
@@ -196,11 +220,11 @@ func (m *mcm) Start(ctx context.Context) error {
 			if err != nil {
 				return errors.Wrap(err, "failed to create management context")
 			}
-
+			//2、添加管理数据
 			if err := managementdata.Add(ctx, m.wranglerContext, management); err != nil {
 				return errors.Wrap(err, "failed to add management data")
 			}
-
+			//3、注册资源的controller的handler事件，注册managementController.RegisterWrangler
 			managementController.Register(ctx, management, m.ScaledContext.ClientGetter.(*clustermanager.Manager), m.wranglerContext)
 			if err := managementController.RegisterWrangler(ctx, m.wranglerContext, management, m.ScaledContext.ClientGetter.(*clustermanager.Manager)); err != nil {
 				return errors.Wrap(err, "failed to register wrangler controllers")
@@ -210,11 +234,11 @@ func (m *mcm) Start(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-
+		//4、启动遥测
 		if err := telemetry.Start(ctx, m.httpsListenPort, m.ScaledContext); err != nil {
 			return errors.Wrap(err, "failed to telemetry")
 		}
-
+		//5、tokens 的过期清理
 		tokens.StartPurgeDaemon(ctx, management)
 		providerrefresh.StartRefreshDaemon(ctx, m.ScaledContext, management)
 		managementdata.CleanupOrphanedSystemUsers(ctx, management)

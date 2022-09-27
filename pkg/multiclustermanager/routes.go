@@ -2,16 +2,10 @@ package multiclustermanager
 
 import (
 	"context"
-	"github.com/rancher/apiserver/pkg/urlbuilder"
-	"github.com/rancher/rancher/pkg/karmadaproxy"
-	"github.com/sirupsen/logrus"
-	"k8s.io/apimachinery/pkg/util/proxy"
-	"net/http"
-	"strings"
-
 	"github.com/gorilla/mux"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rancher/apiserver/pkg/parse"
+	"github.com/rancher/apiserver/pkg/urlbuilder"
 	"github.com/rancher/rancher/pkg/api/norman"
 	"github.com/rancher/rancher/pkg/api/norman/customization/aks"
 	"github.com/rancher/rancher/pkg/api/norman/customization/clusterregistrationtokens"
@@ -30,6 +24,7 @@ import (
 	rancherdialer "github.com/rancher/rancher/pkg/dialer"
 	"github.com/rancher/rancher/pkg/httpproxy"
 	k8sProxyPkg "github.com/rancher/rancher/pkg/k8sproxy"
+	"github.com/rancher/rancher/pkg/karmadaproxy"
 	"github.com/rancher/rancher/pkg/metrics"
 	"github.com/rancher/rancher/pkg/multiclustermanager/whitelist"
 	"github.com/rancher/rancher/pkg/pipeline/hooks"
@@ -39,10 +34,15 @@ import (
 	"github.com/rancher/rancher/pkg/tunnelserver/mcmauthorizer"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/steve/pkg/auth"
+	"github.com/sirupsen/logrus"
+	"k8s.io/apimachinery/pkg/util/proxy"
+	"net/http"
+	"strings"
 )
 
 var (
-	er = &errorResponder{}
+	er             = &errorResponder{}
+	managerContext *config.ScaledContext
 )
 
 type errorResponder struct {
@@ -62,18 +62,17 @@ func router(ctx context.Context, localClusterEnabled bool, tunnelAuthorizer *mcm
 		clusterImport        = clusterregistrationtokens.ClusterImport{Clusters: scaledContext.Management.Clusters("")}
 		karmadaProxy         = karmadaproxy.NewProxy()
 	)
-
-	//1、创建token 处理函数，使用的是norman的api接口方式
+	managerContext = scaledContext
 	tokenAPI, err := tokens.NewAPIHandler(ctx, scaledContext, norman.ConfigureAPIUI)
 	if err != nil {
 		return nil, err
 	}
-	//2、公共API handler，使用的是norman的api接口方式
+
 	publicAPI, err := publicapi.NewHandler(ctx, scaledContext, norman.ConfigureAPIUI)
 	if err != nil {
 		return nil, err
 	}
-	//管理接口创建，平台相关资源初始化
+
 	managementAPI, err := managementapi.New(ctx, scaledContext, clusterManager, k8sProxy, localClusterEnabled)
 	if err != nil {
 		return nil, err
@@ -83,7 +82,7 @@ func router(ctx context.Context, localClusterEnabled bool, tunnelAuthorizer *mcm
 	if err != nil {
 		return nil, err
 	}
-	//监控数据的处理接口
+
 	metricsHandler := metrics.NewMetricsHandler(scaledContext, clusterManager, promhttp.Handler())
 
 	channelserver := channelserver.NewHandler(ctx)
@@ -104,7 +103,7 @@ func router(ctx context.Context, localClusterEnabled bool, tunnelAuthorizer *mcm
 
 	unauthed.Path("/").MatcherFunc(parse.MatchNotBrowser).Handler(managementAPI)
 	unauthed.Handle("/v3/connect/config", connectConfigHandler)
-	unauthed.Handle("/v3/connect", connectHandler) // agent websocket client 连接请求
+	unauthed.Handle("/v3/connect", connectHandler)
 	unauthed.Handle("/v3/connect/register", connectHandler)
 	unauthed.Handle("/v3/import/{token}_{clusterId}.yaml", http.HandlerFunc(clusterImport.ClusterImportHandler))
 	unauthed.Handle("/v3/settings/cacerts", managementAPI).MatcherFunc(onlyGet)
@@ -119,7 +118,8 @@ func router(ctx context.Context, localClusterEnabled bool, tunnelAuthorizer *mcm
 	unauthed.PathPrefix("/v1-{prefix}-release/release").Handler(channelserver)
 	unauthed.PathPrefix("/v1-saml").Handler(saml.AuthHandler())
 	unauthed.PathPrefix("/v3-public").Handler(publicAPI)
-	unauthed.HandleFunc("/test", joinClusterName)
+	// karmada routes
+	//unauthed.HandleFunc("/karmada/cluster/joinCluster/upLoadConfig", joinClusterConfig).Methods("POST")
 	unauthed.MatcherFunc(matchV1Karmada).HandlerFunc(karmadaproxy.ProxyRequestHandler(karmadaProxy))
 
 	// Authenticated routes
@@ -150,24 +150,16 @@ func router(ctx context.Context, localClusterEnabled bool, tunnelAuthorizer *mcm
 	}, nil
 }
 
-func karmadaHandle(rw http.ResponseWriter, req *http.Request) {
-	logrus.Infof(" multiclustermanager URL %s ", req.URL)
-	logrus.Infof(" multiclustermanager URL %s ", req.URL.Host)
-	logrus.Infof(" multiclustermanager req.Header%s ", req.Header.Get("Authorization"))
-
-	strings.ReplaceAll(req.URL.Host, "%!F(MISSING)", "")
-	logrus.Infof(" multiclustermanager URL %s ", req.URL)
-	logrus.Infof(" multiclustermanager URL %s ", req.URL.Host)
-	httpProxy := proxy.NewUpgradeAwareHandler(req.URL, nil, true, false, er)
-	httpProxy.ServeHTTP(rw, req)
-}
-
 // onlyGet will match only GET but will not return a 405 like route.Methods and instead just not match
 func onlyGet(req *http.Request, m *mux.RouteMatch) bool {
 	return req.Method == http.MethodGet
 }
-func joinClusterName(writer http.ResponseWriter, request *http.Request) {
-	// 根据请求body创建一个json解析器实例
-	logrus.Infof(" joinClusterName URL %s ", request.URL)
-	logrus.Infof(" joinClusterName URL %s ", request.URL.Host)
+
+func karmadaHandle(rw http.ResponseWriter, req *http.Request) {
+	logrus.Infof(" multiclustermanager URL.Path %s ", req.URL)
+	logrus.Infof(" multiclustermanager req.Header%s ", req.Header.Get("Authorization"))
+	httpProxy := proxy.NewUpgradeAwareHandler(req.URL, nil, true, false, er)
+	httpProxy.ServeHTTP(rw, req)
 }
+
+// join cluster config

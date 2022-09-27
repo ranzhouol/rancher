@@ -156,6 +156,7 @@ func (r *RemoteService) getTransport() (http.RoundTripper, error) {
 	//2、添加证书，证书集群状态中获取
 	transport := &http.Transport{}
 	if newCluster.Status.CACert != "" {
+
 		certBytes, err := base64.StdEncoding.DecodeString(newCluster.Status.CACert)
 		logrus.Infof(" getTransport  certs  URL %s ", newCluster.Status.CACert)
 		if err != nil {
