@@ -49,10 +49,11 @@ require (
 	github.com/Azure/go-autorest/autorest v0.11.19
 	github.com/Azure/go-autorest/autorest/adal v0.9.14
 	github.com/Azure/go-autorest/autorest/to v0.4.1-0.20210111195520-9fc88b15294e
+	github.com/BurntSushi/toml v0.4.1 // indirect
 	github.com/DataDog/zstd v1.4.5 // indirect
 	github.com/Masterminds/semver/v3 v3.1.1
 	github.com/Masterminds/sprig/v3 v3.2.2
-	github.com/aws/aws-sdk-go v1.42.27
+	github.com/aws/aws-sdk-go v1.38.65
 	github.com/bep/debounce v1.2.0
 	github.com/blang/semver v3.5.1+incompatible
 	github.com/coreos/go-iptables v0.6.0
@@ -66,12 +67,13 @@ require (
 	github.com/docker/go-connections v0.4.0
 	github.com/docker/libtrust v0.0.0-20160708172513-aabc10ec26b7 // indirect
 	github.com/ehazlett/simplelog v0.0.0-20200226020431-d374894e92a4
-	github.com/evanphx/json-patch v4.12.0+incompatible
+	github.com/evanphx/json-patch v4.11.0+incompatible
+	github.com/fatih/color v1.13.0 // indirect
 	github.com/garyburd/redigo v1.6.2 // indirect
 	github.com/ghodss/yaml v1.0.0
 	github.com/go-asn1-ber/asn1-ber v1.5.3 // indirect
 	github.com/go-ldap/ldap/v3 v3.4.1
-	github.com/go-logr/logr v1.2.0
+	github.com/go-logr/logr v0.4.0
 	github.com/gofrs/flock v0.8.1 // indirect
 	github.com/golang-jwt/jwt v3.2.1+incompatible
 	github.com/golang/protobuf v1.5.2
@@ -84,23 +86,23 @@ require (
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hashicorp/golang-lru v0.5.4
 	github.com/heptio/authenticator v0.0.0-20180409043135-d282f87a1972
-	github.com/karmada-io/karmada v1.3.0
 	github.com/knative/pkg v0.0.0-20190817231834-12ee58e32cc8
 	github.com/kr/pretty v0.3.0
 	github.com/lib/pq v1.10.3 // indirect
-	github.com/mattn/go-colorable v0.1.12
+	github.com/mattn/go-colorable v0.1.11
 	github.com/mcuadros/go-version v0.0.0-20180611085657-6d5863ca60fa
 	github.com/minio/minio-go/v7 v7.0.10
-	github.com/mitchellh/mapstructure v1.4.3
+	github.com/mitchellh/mapstructure v1.4.2
 	github.com/moby/locker v1.0.1
 	github.com/mrjones/oauth v0.0.0-20180629183705-f4e24b6d100c
+	github.com/onsi/gomega v1.16.0 // indirect
 	github.com/oracle/oci-go-sdk v18.0.0+incompatible
 	github.com/pborman/uuid v1.2.0
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.52.0
-	github.com/prometheus/client_golang v1.12.1
+	github.com/prometheus/client_golang v1.11.0
 	github.com/prometheus/client_model v0.2.0
-	github.com/prometheus/common v0.32.1
+	github.com/prometheus/common v0.32.0
 	github.com/rancher/aks-operator v1.0.3
 	github.com/rancher/apiserver v0.0.0-20211025232108-df28932a5627
 	github.com/rancher/channelserver v0.5.1-0.20210618172430-5cbefd383369
@@ -127,6 +129,7 @@ require (
 	github.com/satori/go.uuid v1.2.0
 	github.com/segmentio/kafka-go v0.0.0-20190411192201-218fd49cff39
 	github.com/sirupsen/logrus v1.8.1
+	github.com/spf13/viper v1.9.0 // indirect
 	github.com/stretchr/testify v1.7.0
 	github.com/tomnomnom/linkheader v0.0.0-20180905144013-02ca5825eb80
 	github.com/urfave/cli v1.22.2
@@ -140,32 +143,35 @@ require (
 	github.com/yvasiyarov/go-metrics v0.0.0-20150112132944-c25f46c4b940 // indirect
 	github.com/yvasiyarov/gorelic v0.0.7 // indirect
 	github.com/yvasiyarov/newrelic_platform_go v0.0.0-20160601141957-9c099fbc30e9 // indirect
-	golang.org/x/crypto v0.0.0-20220214200702-86341886e292
-	golang.org/x/mod v0.6.0-dev.0.20220106191415-9b9b3d81d5e3
-	golang.org/x/net v0.0.0-20220127200216-cd36cc0744dd
-	golang.org/x/oauth2 v0.0.0-20211104180415-d3ed0bb246c8
+	golang.org/x/crypto v0.0.0-20210921155107-089bfa567519
+	golang.org/x/mod v0.5.0
+	golang.org/x/net v0.0.0-20210805182204-aaa1db679c0d
+	golang.org/x/oauth2 v0.0.0-20210819190943-2bc19b11175f
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
-	google.golang.org/api v0.63.0
-	google.golang.org/grpc v1.43.0
+	golang.org/x/sys v0.0.0-20211013075003-97ac67df715c // indirect
+	golang.org/x/text v0.3.7 // indirect
+	golang.org/x/tools v0.1.7 // indirect
+	google.golang.org/api v0.56.0
+	google.golang.org/grpc v1.40.0
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 	gopkg.in/yaml.v2 v2.4.0
 	helm.sh/helm/v3 v3.7.1
-	k8s.io/api v0.24.2
-	k8s.io/apiextensions-apiserver v0.24.2
-	k8s.io/apimachinery v0.24.2
-	k8s.io/apiserver v0.24.2
-	k8s.io/cli-runtime v0.24.2
+	k8s.io/api v0.22.3
+	k8s.io/apiextensions-apiserver v0.22.3
+	k8s.io/apimachinery v0.22.3
+	k8s.io/apiserver v0.22.3
+	k8s.io/cli-runtime v0.22.3
 	k8s.io/client-go v12.0.0+incompatible
-	k8s.io/gengo v0.0.0-20211129171323-c02415ce4185
+	k8s.io/gengo v0.0.0-20201214224949-b6c5ce23f027
 	k8s.io/helm v2.16.7+incompatible
-	k8s.io/klog/v2 v2.60.1
-	k8s.io/kube-aggregator v0.24.2
-	k8s.io/kubectl v0.24.2
+	k8s.io/klog/v2 v2.10.0
+	k8s.io/kube-aggregator v0.21.0
+	k8s.io/kubectl v0.22.3
 	k8s.io/kubernetes v1.21.0
-	k8s.io/utils v0.0.0-20220210201930-3a6ce19ff2f9
+	k8s.io/utils v0.0.0-20210819203725-bdf08cb9a70a
 	sigs.k8s.io/aws-iam-authenticator v0.5.1
-	sigs.k8s.io/cluster-api v1.0.1
-	sigs.k8s.io/controller-runtime v0.12.2
-	sigs.k8s.io/yaml v1.3.0
+	sigs.k8s.io/cluster-api v0.4.4
+	sigs.k8s.io/controller-runtime v0.9.7
+	sigs.k8s.io/yaml v1.2.0
 )

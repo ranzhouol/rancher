@@ -1,9 +1,8 @@
 package hash
 
 import (
-	"hash"
-
 	"github.com/kr/pretty"
+	"hash"
 )
 
 // DeepHashObject writes specified object to hash using the pretty library
