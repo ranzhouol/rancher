@@ -2,6 +2,7 @@ package multiclustermanager
 
 import (
 	"context"
+	"fmt"
 	"github.com/gorilla/mux"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rancher/apiserver/pkg/parse"
@@ -25,6 +26,7 @@ import (
 	"github.com/rancher/rancher/pkg/httpproxy"
 	k8sProxyPkg "github.com/rancher/rancher/pkg/k8sproxy"
 	"github.com/rancher/rancher/pkg/karmadaproxy"
+	"github.com/rancher/rancher/pkg/karmadaproxy/join"
 	"github.com/rancher/rancher/pkg/metrics"
 	"github.com/rancher/rancher/pkg/multiclustermanager/whitelist"
 	"github.com/rancher/rancher/pkg/pipeline/hooks"
@@ -35,7 +37,10 @@ import (
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/steve/pkg/auth"
 	"github.com/sirupsen/logrus"
+	"io/ioutil"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/proxy"
+	"k8s.io/client-go/tools/clientcmd"
 	"net/http"
 	"strings"
 )
@@ -60,7 +65,7 @@ func router(ctx context.Context, localClusterEnabled bool, tunnelAuthorizer *mcm
 		connectHandler       = scaledContext.Dialer.(*rancherdialer.Factory).TunnelServer
 		connectConfigHandler = rkenodeconfigserver.Handler(tunnelAuthorizer, scaledContext)
 		clusterImport        = clusterregistrationtokens.ClusterImport{Clusters: scaledContext.Management.Clusters("")}
-		karmadaProxy         = karmadaproxy.NewKarmadaJoinProxy(scaledContext)
+		karmadaProxy         = karmadaproxy.NewProxy()
 	)
 	managerContext = scaledContext
 	tokenAPI, err := tokens.NewAPIHandler(ctx, scaledContext, norman.ConfigureAPIUI)
@@ -119,6 +124,7 @@ func router(ctx context.Context, localClusterEnabled bool, tunnelAuthorizer *mcm
 	unauthed.PathPrefix("/v1-saml").Handler(saml.AuthHandler())
 	unauthed.PathPrefix("/v3-public").Handler(publicAPI)
 	// karmada routes
+	unauthed.HandleFunc("/karmada/cluster/joinCluster/upLoadConfig", joinClusterConfig).Methods("POST")
 	unauthed.MatcherFunc(matchV1Karmada).HandlerFunc(karmadaproxy.ProxyRequestHandler(karmadaProxy))
 
 	// Authenticated routes
@@ -159,4 +165,60 @@ func karmadaHandle(rw http.ResponseWriter, req *http.Request) {
 	logrus.Infof(" multiclustermanager req.Header%s ", req.Header.Get("Authorization"))
 	httpProxy := proxy.NewUpgradeAwareHandler(req.URL, nil, true, false, er)
 	httpProxy.ServeHTTP(rw, req)
+}
+
+/// join cluster config
+func joinClusterConfig(writer http.ResponseWriter, request *http.Request) {
+	//join cluster name and config
+	clusterName := request.FormValue("clusterName")
+	clusterConfig, header, _ := request.FormFile("clusterConfig")
+
+	byteClusterConfig, _ := ioutil.ReadAll(clusterConfig)
+	logrus.Infof("ClusterName=%s\n", clusterName)
+	logrus.Infof("upload filename:", header.Filename)
+
+	//替换集群名字
+	strClusterConfig := string(byteClusterConfig)
+	indexCurcontext := strings.Index(strClusterConfig, "current-context:")
+	if indexCurcontext != -1 {
+		indexCurcontextStart := indexCurcontext + 17
+		indexCurcontextEnd := indexCurcontextStart
+		for ; indexCurcontextEnd < len(strClusterConfig); indexCurcontextEnd++ {
+			if string(strClusterConfig[indexCurcontextEnd]) == "\n" {
+				break
+			}
+		}
+		replace_name := strClusterConfig[indexCurcontextStart:indexCurcontextEnd]
+		strClusterConfig = strings.Replace(strClusterConfig, replace_name, clusterName, -1)
+	}
+	byteClusterConfig = []byte(strClusterConfig)
+
+	//get join cluster RestConfig
+	clusterRestConfig, err := clientcmd.RESTConfigFromKubeConfig(byteClusterConfig)
+	if err != nil {
+		//panic(err)
+		fmt.Errorf("err: ", err.Error())
+		return
+	}
+
+	//get secret
+	karmadaSecret, err := managerContext.Core.Secrets("karmada-system").Get("karmada-kubeconfig", metav1.GetOptions{})
+	//karmadaSecret, err := secretClient.Get(context.TODO(), "karmada-kubeconfig", metav1.GetOptions{})
+	if err != nil {
+		karmadaSecret, err = managerContext.Core.Secrets("karmada-system").Get("kubeconfig", metav1.GetOptions{})
+		if err != nil {
+			fmt.Errorf("err: ", err.Error())
+			return
+		}
+	}
+	//get karmadarestconfig
+	karmadaConfig, err := clientcmd.RESTConfigFromKubeConfig(karmadaSecret.Data["kubeconfig"])
+	if err != nil {
+		fmt.Errorf("err: ", err.Error())
+		return
+	}
+
+	//join cluster
+	join.JoinCluster(karmadaConfig, clusterRestConfig, "",clusterName)
+	//对参数进行修改，之后进行
 }
