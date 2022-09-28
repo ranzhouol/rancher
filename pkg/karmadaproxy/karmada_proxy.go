@@ -47,7 +47,7 @@ func errorHandler() func(http.ResponseWriter, *http.Request, error) {
 }
 
 func ProxyRequestHandler(proxy *httputil.ReverseProxy) func(http.ResponseWriter, *http.Request) {
-	return func(w http.ResponseWriter, r *http.Request) {
-		proxy.ServeHTTP(w, r)
+	return func(w http.ResponseWriter, request *http.Request) {
+		proxy.ServeHTTP(w, request)
 	}
 }

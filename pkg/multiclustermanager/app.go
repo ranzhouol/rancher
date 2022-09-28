@@ -2,10 +2,6 @@ package multiclustermanager
 
 import (
 	"context"
-	"fmt"
-	apiv1 "k8s.io/api/core/v1"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/clientcmd"
 	"net/http"
 	"os"
 	"sync"
@@ -116,27 +112,27 @@ func newMCM(ctx context.Context, wranglerContext *wrangler.Context, cfg *Options
 		return nil, err
 	}
 	//karmada 整合
-	karmadaSecret, err := scaledContext.Core.Secrets("karmada-system").Get("karmada-kubeconfig", metav1.GetOptions{})
-	logrus.Infof("Rancher karmadaSecret %s", karmadaSecret.Data["kubeconfig"])
-	logrus.Infof("Rancher karmadaSecret %s", karmadaSecret.Data["kubeconfig"])
-
-	config, err := clientcmd.RESTConfigFromKubeConfig(karmadaSecret.Data["kubeconfig"])
-
-	//client, err := proxy.NewClientGetterFromConfig(*config)
-
-	clientset, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		panic(err)
-	}
-
-	deploymentsClient := clientset.AppsV1().Deployments(apiv1.NamespaceDefault)
-	list, err := deploymentsClient.List(context.TODO(), metav1.ListOptions{})
-	if err != nil {
-		panic(err)
-	}
-	for _, d := range list.Items {
-		fmt.Printf(" * %s (%d replicas)\n", d.Name, *d.Spec.Replicas)
-	}
+	//karmadaSecret, err := scaledContext.Core.Secrets("karmada-system").Get("karmada-kubeconfig", metav1.GetOptions{})
+	//logrus.Infof("Rancher karmadaSecret %s", karmadaSecret.Data["kubeconfig"])
+	//logrus.Infof("Rancher karmadaSecret %s", karmadaSecret.Data["kubeconfig"])
+	//
+	//config, err := clientcmd.RESTConfigFromKubeConfig(karmadaSecret.Data["kubeconfig"])
+	//
+	////client, err := proxy.NewClientGetterFromConfig(*config)
+	//
+	//clientset, err := kubernetes.NewForConfig(config)
+	//if err != nil {
+	//	panic(err)
+	//}
+	//
+	//deploymentsClient := clientset.AppsV1().Deployments(apiv1.NamespaceDefault)
+	//list, err := deploymentsClient.List(context.TODO(), metav1.ListOptions{})
+	//if err != nil {
+	//	panic(err)
+	//}
+	//for _, d := range list.Items {
+	//	fmt.Printf(" * %s (%d replicas)\n", d.Name, *d.Spec.Replicas)
+	//}
 
 	if os.Getenv("CATTLE_PROMETHEUS_METRICS") == "true" {
 		metrics.Register(ctx, scaledContext)
