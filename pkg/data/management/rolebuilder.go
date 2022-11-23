@@ -18,6 +18,7 @@ import (
 var defaultGRLabel = map[string]string{"authz.management.cattle.io/bootstrapping": "default-globalrole"}
 var defaultRTLabel = map[string]string{"authz.management.cattle.io/bootstrapping": "default-roletemplate"}
 
+// go里面的构建者模式
 type roleBuilder struct {
 	previous          *roleBuilder
 	next              *roleBuilder

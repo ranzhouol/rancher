@@ -404,6 +404,7 @@ func (m *userManager) EnsureUser(principalName, displayName string) (*v3.User, e
 	var labelSet labels.Set
 
 	// First check the local cache
+	//1、缓存中查询用户,之后从etcd中进行查询
 	user, err = m.checkCache(principalName)
 	if err != nil {
 		return nil, err
@@ -416,11 +417,12 @@ func (m *userManager) EnsureUser(principalName, displayName string) (*v3.User, e
 			return nil, err
 		}
 	}
-
+	//2、用户不存在说明不是正常创建的，是第三方的平台提供的，需要重新创建用户和绑定角色
 	if user != nil {
 		// If the user does not have the annotation it indicates the user was created
 		// through the UI or from a previous rancher version so don't add the
 		// default bindings.
+		//如果用户没有注释，则表示该用户是通过UI创建的，或来自以前的rancher，因此不要添加默认绑定。
 		if _, ok := user.Annotations[roleTemplatesRequired]; !ok {
 			return user, nil
 		}
@@ -428,6 +430,7 @@ func (m *userManager) EnsureUser(principalName, displayName string) (*v3.User, e
 		if v32.UserConditionInitialRolesPopulated.IsTrue(user) {
 			// The users global role bindings were already created. They can differ
 			// from what is in the annotation if they were updated manually.
+			//已经创建了用户全局角色绑定。如果手动更新，它们可能与注释中的内容不同。
 			return user, nil
 		}
 	} else {

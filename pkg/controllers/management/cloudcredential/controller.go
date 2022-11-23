@@ -42,6 +42,7 @@ func (n *Controller) ccSync(key string, cloudCredential *v1.Secret) (runtime.Obj
 	if !ok {
 		return cloudCredential, fmt.Errorf("cloud credential %v has no creatorId annotation", cloudCredential.Name)
 	}
+	// 添加角色绑定
 	if err := rbac.CreateRoleAndRoleBinding(
 		rbac.CloudCredentialResource, typesv1.SecretResource.Kind, cloudCredential.Name, namespace.GlobalNamespace, "v1", creatorID, []string{"*"}, cloudCredential.UID, []v32.Member{},
 		n.managementContext); err != nil {

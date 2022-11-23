@@ -138,7 +138,7 @@ func setupSteveAggregation() error {
 		"url":                []byte(url + "/v3/connect"),
 		"token":              []byte("stv-cluster-" + token),
 	}
-
+	// 获取SA
 	ca, err := ioutil.ReadFile("/etc/kubernetes/ssl/certs/serverca")
 	if os.IsNotExist(err) {
 	} else if err != nil {

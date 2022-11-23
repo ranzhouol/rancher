@@ -63,7 +63,7 @@ var (
 	PeerServices                      = NewSetting("peer-service", os.Getenv("CATTLE_PEER_SERVICE"))
 	RDNSServerBaseURL                 = NewSetting("rdns-base-url", "https://api.lb.rancher.cloud/v1")
 	RkeVersion                        = NewSetting("rke-version", "")
-	RkeMetadataConfig                 = NewSetting("rke-metadata-config", getMetadataConfig())
+	RkeMetadataConfig                 = NewSetting("rke-metadata-config", getMetadataConfig()) // RKE 元数据配置
 	ServerImage                       = NewSetting("server-image", "rancher/rancher")
 	ServerURL                         = NewSetting("server-url", "")
 	ServerVersion                     = NewSetting("server-version", "dev")
@@ -127,6 +127,7 @@ func FullShellImage() string {
 	return PrefixPrivateRegistry(ShellImage.Get())
 }
 
+// 判断是否是从私有仓库获取镜像
 func PrefixPrivateRegistry(image string) string {
 	private := SystemDefaultRegistry.Get()
 	if private == "" {

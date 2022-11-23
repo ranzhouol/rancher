@@ -40,7 +40,7 @@ var (
 
 func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) (string, error) {
 	rb := newRoleBuilder()
-
+	// 1、集群创建的RB
 	rb.addRole("Create Clusters", "clusters-create").
 		addRule().apiGroups("management.cattle.io").resources("clusters").verbs("create").
 		addRule().apiGroups("provisioning.cattle.io").resources("clusters").verbs("create").
@@ -53,15 +53,17 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		addRule().apiGroups("management.cattle.io").resources("cisconfigs").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("cisbenchmarkversions").verbs("get", "list", "watch").
 		addRule().apiGroups("rke-machine-config.cattle.io").resources("*").verbs("create")
-
+	// 2、nodedrivers创建的RB
 	rb.addRole("Manage Node Drivers", "nodedrivers-manage").
 		addRule().apiGroups("management.cattle.io").resources("nodedrivers").verbs("*")
 	rb.addRole("Manage Cluster Drivers", "kontainerdrivers-manage").
 		addRule().apiGroups("management.cattle.io").resources("kontainerdrivers").verbs("*")
+	// 3、Catalogs创建的RB
 	rb.addRole("Manage Catalogs", "catalogs-manage").
 		addRule().apiGroups("management.cattle.io").resources("catalogs", "templates", "templateversions").verbs("*")
 	rb.addRole("Use Catalog Templates", "catalogs-use").
 		addRule().apiGroups("management.cattle.io").resources("templates", "templateversions").verbs("get", "list", "watch")
+	// 4、Users创建的RB
 	rb.addRole("Manage Users", "users-manage").
 		addRule().apiGroups("management.cattle.io").resources("users", "globalrolebindings").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("globalroles").verbs("get", "list", "watch")
@@ -79,13 +81,14 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		addRule().apiGroups("management.cattle.io").resources("clustertemplates").verbs("create")
 	rb.addRole("Create RKE Template Revisions", "clustertemplaterevisions-create").
 		addRule().apiGroups("management.cattle.io").resources("clustertemplaterevisions").verbs("create")
+	// 5、Metrics创建的RB
 	rb.addRole("View Rancher Metrics", "view-rancher-metrics").
 		addRule().apiGroups("management.cattle.io").resources("ranchermetrics").verbs("get")
-
+	//6、Admin创建的RB
 	rb.addRole("Admin", "admin").
 		addRule().apiGroups("*").resources("*").verbs("*").
 		addRule().apiGroups().nonResourceURLs("*").verbs("*")
-
+	//7、受限管理员的权限
 	// restricted-admin will get cluster admin access to all downstream clusters but limited access to the local cluster
 	restrictedAdminRole := addUserRules(rb.addRole("Restricted Admin", "restricted-admin"))
 	restrictedAdminRole.

@@ -380,7 +380,7 @@ func (m *Manager) logout(actionName string, action *types.Action, request *types
 	}
 	w.Header().Add("Content-type", "application/json")
 
-	//getToken
+	//getToken，删除token
 	status, err := m.deleteToken(tokenAuthValue)
 	if err != nil {
 		logrus.Errorf("DeleteToken failed with error: %v", err)

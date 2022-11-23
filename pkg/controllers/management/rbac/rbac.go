@@ -39,6 +39,7 @@ var subjectWithAllUsers = k8srbacv1.Subject{
 	APIGroup: rbacv1.GroupName,
 }
 
+// 创建角色绑定
 func CreateRoleAndRoleBinding(resource, kind, name, namespace, apiVersion, creatorID string, apiGroup []string, UID types.UID, members []v32.Member,
 	mgmt *config.ManagementContext) error {
 	/* Create 3 Roles containing the CRD, and the current CR in resourceNames list

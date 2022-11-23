@@ -19,8 +19,9 @@ func sync(_ string, obj *v3.Feature) (*v3.Feature, error) {
 	if obj == nil || obj.DeletionTimestamp != nil {
 		return nil, nil
 	}
-
+	// 获取有效的参数
 	val := getEffectiveValue(obj)
+	// 同步 Features
 	if err := ReconcileFeatures(obj, val); err != nil {
 		time.Sleep(3 * time.Second)
 		logrus.Fatalf("%v", err)
@@ -46,7 +47,10 @@ func getEffectiveValue(obj *v3.Feature) bool {
 // not match the feature value in etcd AND the feature is non-dynamic.
 // Otherwise, the feature value in memory is reconciled and no error is
 // returned.
+//如果内存中的特征值与etcd中的特征值不匹配且该特征是非动态的，则返回一个错误。否则，内存中的特征值将被调和，不返回错误
+// 根据etcd的数据变化，更新内存中feature的数据值
 func ReconcileFeatures(obj *v3.Feature, newVal bool) error {
+	//获取内存中的数据
 	feature := features.GetFeatureByName(obj.Name)
 
 	// possible feature watch renamed, or no longer used by rancher

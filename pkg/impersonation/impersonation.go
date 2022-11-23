@@ -25,6 +25,7 @@ const (
 	ImpersonationPrefix    = "cattle-impersonation-"
 )
 
+//扮演者，主要是用户下游集群的认证
 type Impersonator struct {
 	user                user.Info
 	clusterContext      *config.UserContext
@@ -48,12 +49,15 @@ func New(userInfo user.Info, group string, clusterContext *config.UserContext) (
 }
 
 func (i *Impersonator) SetUpImpersonation() (*corev1.ServiceAccount, error) {
+	//1、 获取rules
 	rules := i.rulesForUser()
 	logrus.Tracef("impersonation: checking role for user %s", i.user.GetName())
+	//2、更新role
 	role, err := i.checkAndUpdateRole(rules)
 	if err != nil {
 		return nil, err
 	}
+	//3、获取SA
 	if role != nil {
 		sa, err := i.getServiceAccount()
 		// in case the role exists but we were interrupted before creating the service account, proceed to create resources

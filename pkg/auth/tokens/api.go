@@ -45,7 +45,7 @@ func NewAPIHandler(ctx context.Context, apiContext *config.ScaledContext, opts .
 	schema.ListHandler = api.tokenListHandler
 	schema.CreateHandler = api.tokenCreateHandler
 	schema.DeleteHandler = api.tokenDeleteHandler
-
+	// 3、同样使用的normanapi
 	server := normanapi.NewAPIServer()
 	if err := server.AddSchemas(schemas); err != nil {
 		return nil, err

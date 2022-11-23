@@ -15,9 +15,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/management/clusterstats"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterstatus"
 	"github.com/rancher/rancher/pkg/controllers/management/clustertemplate"
-	"github.com/rancher/rancher/pkg/controllers/management/drivers/kontainerdriver"
 	"github.com/rancher/rancher/pkg/controllers/management/etcdbackup"
-	"github.com/rancher/rancher/pkg/controllers/management/kontainerdrivermetadata"
 	"github.com/rancher/rancher/pkg/controllers/management/node"
 	"github.com/rancher/rancher/pkg/controllers/management/nodepool"
 	"github.com/rancher/rancher/pkg/controllers/management/nodetemplate"
@@ -35,6 +33,7 @@ import (
 func Register(ctx context.Context, management *config.ManagementContext, manager *clustermanager.Manager, wrangler *wrangler.Context) {
 	// auth handlers need to run early to create namespaces that back clusters and projects
 	// also, these handlers are purely in the mgmt plane, so they are lightweight compared to those that interact with machines and clusters
+	//1、注册认证相关的Schemes
 	auth.RegisterEarly(ctx, management, manager)
 	usercontrollers.RegisterEarly(ctx, management, manager)
 
@@ -47,8 +46,8 @@ func Register(ctx context.Context, management *config.ManagementContext, manager
 	clusterprovisioner.Register(ctx, management)
 	clusterstats.Register(ctx, management, manager)
 	clusterstatus.Register(ctx, management)
-	kontainerdriver.Register(ctx, management)
-	kontainerdrivermetadata.Register(ctx, management)
+	//kontainerdriver.Register(ctx, management)
+	//kontainerdrivermetadata.Register(ctx, management)
 	//nodedriver.Register(ctx, management)
 	nodepool.Register(ctx, management)
 	cloudcredential.Register(ctx, management)

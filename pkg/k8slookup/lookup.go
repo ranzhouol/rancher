@@ -28,18 +28,20 @@ type lookup struct {
 }
 
 func (l *lookup) Lookup(req *http.Request) (*v3.Cluster, error) {
+	// 1、构建apiContext
 	apiContext := types.NewAPIContext(req, nil, l.schemas)
+	// 2、从req 获取集群的ID
 	clusterID := clusterrouter.GetClusterID(req)
 	if clusterID == "" {
 		return nil, httperror.NewAPIError(httperror.NotFound, "failed to find cluster")
 	}
-
+	// 3、验证集群能否正常访问到
 	if l.validate {
 		// check access
 		if err := access.ByID(apiContext, &schema.Version, client.ClusterType, clusterID, &client.Cluster{}); err != nil {
 			return nil, err
 		}
 	}
-
+	// 4、根据clusterID 获取v3.Cluster
 	return l.clusterLister.Get("", clusterID)
 }

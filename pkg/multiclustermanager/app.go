@@ -22,7 +22,6 @@ import (
 	"github.com/rancher/rancher/pkg/metrics"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/systemtokens"
-	"github.com/rancher/rancher/pkg/telemetry"
 	"github.com/rancher/rancher/pkg/tunnelserver/mcmauthorizer"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/wrangler"
@@ -133,7 +132,7 @@ func newMCM(ctx context.Context, wranglerContext *wrangler.Context, cfg *Options
 	//for _, d := range list.Items {
 	//	fmt.Printf(" * %s (%d replicas)\n", d.Name, *d.Spec.Replicas)
 	//}
-
+	//开启metrics
 	if os.Getenv("CATTLE_PROMETHEUS_METRICS") == "true" {
 		metrics.Register(ctx, scaledContext)
 	}
@@ -220,7 +219,7 @@ func (m *mcm) Start(ctx context.Context) error {
 			if err := managementdata.Add(ctx, m.wranglerContext, management); err != nil {
 				return errors.Wrap(err, "failed to add management data")
 			}
-			//3、注册资源的controller的handler事件，注册managementController.RegisterWrangler
+			//3、注册资源的controller的handler事件，注册managementController.RegisterWrangler TODO 核心事件
 			managementController.Register(ctx, management, m.ScaledContext.ClientGetter.(*clustermanager.Manager), m.wranglerContext)
 			if err := managementController.RegisterWrangler(ctx, m.wranglerContext, management, m.ScaledContext.ClientGetter.(*clustermanager.Manager)); err != nil {
 				return errors.Wrap(err, "failed to register wrangler controllers")
@@ -231,14 +230,15 @@ func (m *mcm) Start(ctx context.Context) error {
 			return err
 		}
 		//4、启动遥测
-		if err := telemetry.Start(ctx, m.httpsListenPort, m.ScaledContext); err != nil {
-			return errors.Wrap(err, "failed to telemetry")
-		}
+		//if err := telemetry.Start(ctx, m.httpsListenPort, m.ScaledContext); err != nil {
+		//	return errors.Wrap(err, "failed to telemetry")
+		//}
 		//5、tokens 的过期清理
 		tokens.StartPurgeDaemon(ctx, management)
 		providerrefresh.StartRefreshDaemon(ctx, m.ScaledContext, management)
 		managementdata.CleanupOrphanedSystemUsers(ctx, management)
 		clusterupstreamrefresher.MigrateEksRefreshCronSetting(m.wranglerContext)
+		// 清楚重复绑定
 		go managementdata.CleanupDuplicateBindings(m.ScaledContext, m.wranglerContext)
 		go managementdata.CleanupOrphanBindings(m.ScaledContext, m.wranglerContext)
 		logrus.Infof("Rancher startup complete")

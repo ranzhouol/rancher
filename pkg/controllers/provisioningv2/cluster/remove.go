@@ -35,7 +35,9 @@ func (h *handler) OnMgmtClusterRemove(_ string, cluster *v3.Cluster) (*v3.Cluste
 
 	var legacyCluster bool
 	for _, provisioningCluster := range provisioningClusters {
+		//1、判断是否是遗留集群
 		legacyCluster = legacyCluster || h.isLegacyCluster(provisioningCluster)
+		//2、从etcd 中 删除对应的集群
 		if err := h.clusters.Delete(provisioningCluster.Namespace, provisioningCluster.Name, nil); err != nil {
 			return nil, err
 		}

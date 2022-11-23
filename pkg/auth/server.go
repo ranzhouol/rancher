@@ -86,7 +86,7 @@ func newAPIManagement(ctx context.Context, scaledContext *config.ScaledContext) 
 	if err != nil {
 		return nil, err
 	}
-
+	//2、登录接口的处理方法
 	publicAPI, err := publicapi.NewHandler(ctx, scaledContext, norman.ConfigureAPIUI)
 	if err != nil {
 		return nil, err

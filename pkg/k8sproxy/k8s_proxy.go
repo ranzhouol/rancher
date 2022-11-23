@@ -11,6 +11,7 @@ import (
 )
 
 func New(scaledContext *config.ScaledContext, dialer dialer.Factory, clusterContextGetter proxy.ClusterContextGetter) http.Handler {
+	// 1、构建k8slookup，且验证下游集群能否访问
 	return clusterrouter.New(&scaledContext.RESTConfig, k8slookup.New(scaledContext, true), dialer,
 		scaledContext.Management.Clusters("").Controller().Lister(),
 		clusterContextGetter)

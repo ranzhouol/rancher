@@ -86,6 +86,7 @@ func (c *ScaledContext) NewManagementContext() (*ManagementContext, error) {
 	if c.managementContext != nil {
 		return c.managementContext, nil
 	}
+	//构建Management的上下文
 	mgmt, err := newManagementContext(c)
 	if err != nil {
 		return nil, err
@@ -130,17 +131,16 @@ func NewScaledContext(config rest.Config, opts *ScaleContextOptions) (*ScaledCon
 	} else {
 		context.ControllerFactory = opts.ControllerFactory
 	}
-
+	//1、构建Management
 	context.Management, err = managementv3.NewFromControllerFactory(context.ControllerFactory)
 	if err != nil {
 		return nil, err
 	}
-
-	context.Project, err = projectv3.NewFromControllerFactory(context.ControllerFactory)
-	if err != nil {
-		return nil, err
-	}
-
+	//context.Project, err = projectv3.NewFromControllerFactory(context.ControllerFactory)
+	//if err != nil {
+	//	return nil, err
+	//}
+	//3、构建K8sClient
 	context.K8sClient, err = kubernetes.NewForConfig(&config)
 	if err != nil {
 		return nil, err
@@ -155,6 +155,7 @@ func NewScaledContext(config rest.Config, opts *ScaleContextOptions) (*ScaledCon
 	if err != nil {
 		return nil, err
 	}
+	//2、构建Project
 	context.Project, err = projectv3.NewFromControllerFactory(context.ControllerFactory)
 	if err != nil {
 		return nil, err

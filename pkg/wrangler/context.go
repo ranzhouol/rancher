@@ -173,7 +173,8 @@ func (w *Context) Start(ctx context.Context) error {
 		if err := w.Dynamic.Register(ctx, w.SharedControllerFactory); err != nil {
 			return err
 		}
-		w.SystemChartsManager.Start(ctx)
+		//TODO  SystemChartsManager
+		//w.SystemChartsManager.Start(ctx)
 		w.started = true
 	}
 

@@ -85,7 +85,7 @@ func Register(
 			clients.Provisioning.Cluster(),
 			clients.Mgmt.Cluster()),
 	}
-
+	// 1、mgmtcontrollers 集群生成
 	mgmtcontrollers.RegisterClusterGeneratingHandler(ctx,
 		clients.Mgmt.Cluster(),
 		clients.Apply.WithCacheTypes(clients.Provisioning.Cluster()),

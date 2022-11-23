@@ -51,6 +51,7 @@ func main() {
 	if len(os.Args) > 1 {
 		err = runArgs(ctx)
 	} else {
+		// 保证kubelet运行
 		if _, err = reconcileKubelet(ctx); err != nil {
 			logrus.Warnf("failed to reconcile kubelet, error: %v", err)
 		}
@@ -60,7 +61,7 @@ func main() {
 		if os.Getenv("CATTLE_DEBUG") == "true" || os.Getenv("RANCHER_DEBUG") == "true" {
 			logrus.SetLevel(logrus.DebugLevel)
 		}
-
+		// 初始化Features
 		initFeatures()
 
 		if os.Getenv("CLUSTER_CLEANUP") == "true" {
@@ -214,7 +215,7 @@ func run(ctx context.Context) error {
 	var httpClient = &http.Client{
 		Timeout: time.Second * 5,
 	}
-
+	// 构建client 请求server，验证请求是否可用
 	_, err = httpClient.Get(server)
 	if err != nil {
 		if strings.Contains(err.Error(), "x509:") {

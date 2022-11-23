@@ -57,6 +57,7 @@ func ToAuthMiddleware(a Authenticator) auth.Middleware {
 type ClusterRouter func(req *http.Request) string
 
 func NewAuthenticator(ctx context.Context, clusterRouter ClusterRouter, mgmtCtx *config.ScaledContext) Authenticator {
+	// 1、token informer
 	tokenInformer := mgmtCtx.Management.Tokens("").Controller().Informer()
 	tokenInformer.AddIndexers(map[string]cache.IndexFunc{tokenKeyIndex: tokenKeyIndexer})
 
@@ -100,6 +101,7 @@ func (a *tokenAuthenticator) Authenticate(req *http.Request) (*AuthenticatorResp
 	authResp := &AuthenticatorResponse{
 		Extras: make(map[string][]string),
 	}
+	//1、从请求中获取token
 	token, err := a.TokenFromRequest(req)
 	if err != nil {
 		return nil, err
@@ -111,7 +113,7 @@ func (a *tokenAuthenticator) Authenticate(req *http.Request) (*AuthenticatorResp
 	if token.ClusterName != "" && token.ClusterName != a.clusterRouter(req) {
 		return nil, errors.Wrapf(ErrMustAuthenticate, "clusterID does not match")
 	}
-
+	//2、从token中获取用户属性
 	attribs, err := a.userAttributeLister.Get("", token.UserID)
 	if err != nil && !apierrors.IsNotFound(err) {
 		return nil, err

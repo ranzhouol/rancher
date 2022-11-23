@@ -65,7 +65,7 @@ func (h *loginHandler) login(actionName string, action *types.Action, request *t
 	}
 
 	w := request.Response
-
+	// 1、登录之后首先创建对应的token unhashedTokenKey、responseType
 	token, unhashedTokenKey, responseType, err := h.createLoginToken(request)
 	if err != nil {
 		// if user fails to authenticate, hide the details of the exact error. bad credentials will already be APIErrors
@@ -75,7 +75,7 @@ func (h *loginHandler) login(actionName string, action *types.Action, request *t
 		}
 		return httperror.WrapAPIError(err, httperror.ServerError, "Server error while authenticating")
 	}
-
+	//2、构建cookie
 	if responseType == "cookie" {
 		tokenCookie := &http.Cookie{
 			Name:     CookieName,
@@ -105,23 +105,24 @@ func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, st
 	var groupPrincipals []v3.Principal
 	var providerToken string
 	logrus.Debugf("Create Token Invoked")
-
+	// 1、读取Request的body
 	bytes, err := ioutil.ReadAll(request.Request.Body)
 	if err != nil {
 		logrus.Errorf("login failed with error: %v", err)
 		return v3.Token{}, "", "", httperror.NewAPIError(httperror.InvalidBodyContent, "")
 	}
-
+	// 2、把body转换成json
 	generic := &v32.GenericLogin{}
 	err = json.Unmarshal(bytes, generic)
 	if err != nil {
 		logrus.Errorf("unmarshal failed with error: %v", err)
 		return v3.Token{}, "", "", httperror.NewAPIError(httperror.InvalidBodyContent, "")
 	}
+	// 3、获取对饮搞得类型和描述
 	responseType := generic.ResponseType
 	description := generic.Description
 	ttl := generic.TTLMillis
-
+	// 4、获取超时时间，生成token的超时时间
 	authTimeout := settings.AuthUserSessionTTLMinutes.Get()
 	if minutes, err := strconv.ParseInt(authTimeout, 10, 64); err == nil {
 		ttl = minutes * 60 * 1000
@@ -181,7 +182,7 @@ func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, st
 		logrus.Errorf("unmarshal failed with error: %v", err)
 		return v3.Token{}, "", "", httperror.NewAPIError(httperror.InvalidBodyContent, "")
 	}
-
+	// 5、验证用户
 	// Authenticate User
 	// SAML's login flow is different from the other providers. Unlike the other providers, it gets the logged in user's data via a POST from
 	// the identity provider on a separate endpoint specifically for that.
@@ -191,7 +192,7 @@ func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, st
 		err = saml.PerformSamlLogin(providerName, request, input)
 		return v3.Token{}, "", "saml", err
 	}
-
+	//6、构建上下文
 	ctx := context.WithValue(request.Request.Context(), util.RequestKey, request.Request)
 	userPrincipal, groupPrincipals, providerToken, err = providers.AuthenticateUser(ctx, input, providerName)
 	if err != nil {
@@ -202,6 +203,7 @@ func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, st
 	if displayName == "" {
 		displayName = userPrincipal.LoginName
 	}
+	//7、获取当前用户
 	currUser, err := h.userMGR.EnsureUser(userPrincipal.Name, displayName)
 	if err != nil {
 		return v3.Token{}, "", "", err
@@ -223,7 +225,7 @@ func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, st
 		}
 		return *token, tokenValue, responseType, nil
 	}
-
+	// 8、获取用户额外信息
 	userExtraInfo := providers.GetUserExtraAttributes(providerName, userPrincipal)
 
 	rToken, unhashedTokenKey, err := h.tokenMGR.NewLoginToken(currUser.Name, userPrincipal, groupPrincipals, providerToken, ttl, description, userExtraInfo)

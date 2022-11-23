@@ -15,11 +15,15 @@ import (
 )
 
 func Setup(ctx context.Context, server *steve.Server, config *wrangler.Context) error {
+	// 用户偏好注册
 	userpreferences.Register(server.BaseSchemas, server.ClientFactory)
+	// 集群注册
 	if err := clusters.Register(ctx, server, config); err != nil {
 		return err
 	}
+	// 机器注册
 	machine.Register(server, config)
+	//
 	navlinks.Register(ctx, server)
 	settings.Register(server)
 	disallow.Register(server)

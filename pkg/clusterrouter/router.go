@@ -16,7 +16,7 @@ type Router struct {
 }
 
 func New(localConfig *rest.Config, lookup ClusterLookup, dialer dialer.Factory, clusterLister v3.ClusterLister, clusterContextGetter proxy.ClusterContextGetter) http.Handler {
-	// 构建router
+	// 构建cluster router factory
 	serverFactory := newFactory(localConfig, dialer, lookup, clusterLister, clusterContextGetter)
 	return &Router{
 		serverFactory: serverFactory,
@@ -25,7 +25,7 @@ func New(localConfig *rest.Config, lookup ClusterLookup, dialer dialer.Factory, 
 
 // 代理请求的处理函数
 func (r *Router) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
-	//1、调用factory get方法，获取handler
+	//1、调用factory get方法，获取handler，根据req 获取对应的handler
 	c, handler, err := r.serverFactory.get(req)
 	if err != nil {
 		e, ok := err.(*httperror.APIError)

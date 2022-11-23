@@ -238,7 +238,7 @@ func (r *RemoteService) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 			er.Error(rw, req, validation.Unauthorized)
 			return
 		}
-		// 获取token
+		// 构建伪装者token，这里的主要作用是转换权限
 		token, err := r.getImpersonatorAccountToken(userInfo)
 		if err != nil && !strings.Contains(err.Error(), dialer2.ErrAgentDisconnected.Error()) {
 			er.Error(rw, req, fmt.Errorf("unable to create impersonator account: %w", err))
@@ -293,16 +293,17 @@ func (r *RemoteService) getImpersonatorAccountToken(user user.Info) (string, err
 	if err != nil {
 		return "", err
 	}
-
+	//2、构建伪装用户
 	i, err := impersonation.New(user, "", clusterContext)
 	if err != nil {
 		return "", fmt.Errorf("error creating impersonation for user %s: %w", user.GetUID(), err)
 	}
-
+	// 2、根据伪装信息构建SA
 	sa, err := i.SetUpImpersonation()
 	if err != nil {
 		return "", fmt.Errorf("error setting up impersonation for user %s: %w", user.GetUID(), err)
 	}
+	//3、根据SA获取对应的token
 	saToken, err := i.GetToken(sa)
 	if err != nil {
 		return "", fmt.Errorf("error getting service account token: %w", err)

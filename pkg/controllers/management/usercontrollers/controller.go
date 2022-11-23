@@ -55,6 +55,7 @@ func RegisterEarly(ctx context.Context, management *config.ManagementContext, ma
 	}
 
 	clusterClient := management.Management.Clusters("")
+	// 添加对应的creat remove update的相关sync
 	clusterClient.AddLifecycle(ctx, "cluster-agent-controller-cleanup", lifecycle)
 }
 

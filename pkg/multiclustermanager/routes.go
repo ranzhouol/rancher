@@ -56,6 +56,7 @@ func (e *errorResponder) Error(w http.ResponseWriter, req *http.Request, err err
 func router(ctx context.Context, localClusterEnabled bool, tunnelAuthorizer *mcmauthorizer.Authorizer, scaledContext *config.ScaledContext, clusterManager *clustermanager.Manager) (func(http.Handler) http.Handler, error) {
 
 	var (
+		// 1、通过代理的方式进行handler
 		k8sProxy             = k8sProxyPkg.New(scaledContext, scaledContext.Dialer, clusterManager)
 		connectHandler       = scaledContext.Dialer.(*rancherdialer.Factory).TunnelServer
 		connectConfigHandler = rkenodeconfigserver.Handler(tunnelAuthorizer, scaledContext)
@@ -67,12 +68,12 @@ func router(ctx context.Context, localClusterEnabled bool, tunnelAuthorizer *mcm
 	if err != nil {
 		return nil, err
 	}
-
+	// 1、publicAPI相关接口，都是normanapi 目的是使用相关的schemes
 	publicAPI, err := publicapi.NewHandler(ctx, scaledContext, norman.ConfigureAPIUI)
 	if err != nil {
 		return nil, err
 	}
-
+	//2、自定义CRD资源经过V3接口的处理方法注册
 	managementAPI, err := managementapi.New(ctx, scaledContext, clusterManager, k8sProxy, localClusterEnabled)
 	if err != nil {
 		return nil, err
@@ -135,7 +136,7 @@ func router(ctx context.Context, localClusterEnabled bool, tunnelAuthorizer *mcm
 	authed.Path("/v3/tokenreview").Methods(http.MethodPost).Handler(&webhook.TokenReviewer{})
 	authed.Path("/metrics").Handler(metricsHandler)
 	authed.Path("/metrics/{clusterID}").Handler(metricsHandler)
-	authed.PathPrefix("/k8s/clusters/").Handler(k8sProxy)
+	authed.PathPrefix("/k8s/clusters/").Handler(k8sProxy) // k8s 集群的路由都转发到k8sProxy
 	authed.PathPrefix("/meta/proxy").Handler(metaProxy)
 	authed.PathPrefix("/v1-telemetry").Handler(telemetry.NewProxy())
 	authed.PathPrefix("/v3/identit").Handler(tokenAPI)

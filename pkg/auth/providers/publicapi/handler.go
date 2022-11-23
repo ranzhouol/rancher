@@ -57,7 +57,7 @@ func authProviderSchemas(ctx context.Context, management *config.ScaledContext, 
 	for _, apSubtype := range authProviderTypes {
 		subSchema := schemas.Schema(&publicSchema.PublicVersion, apSubtype)
 		subSchema.Store = subtype.NewSubTypeStore(apSubtype, schema.Store)
-		subSchema.ActionHandler = lh.login
+		subSchema.ActionHandler = lh.login // 自定义login相关处理
 		subSchema.Formatter = loginActionFormatter
 	}
 

@@ -122,14 +122,14 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		return nil, err
 	}
 	//4、判断是否为嵌入式，用于docker 启动 构建rancher service 和对应的endpoint 和webhook
-	if opts.Embedded {
-		if err := setupRancherService(ctx, restConfig, opts.HTTPSListenPort); err != nil {
-			return nil, err
-		}
-		if err := bumpRancherWebhookIfNecessary(ctx, restConfig); err != nil {
-			return nil, err
-		}
-	}
+	//if opts.Embedded {
+	//	if err := setupRancherService(ctx, restConfig, opts.HTTPSListenPort); err != nil {
+	//		return nil, err
+	//	}
+	//	if err := bumpRancherWebhookIfNecessary(ctx, restConfig); err != nil {
+	//		return nil, err
+	//	}
+	//}
 	//5、构建MultiClusterManager 重点
 	wranglerContext.MultiClusterManager = newMCM(wranglerContext, opts)
 	logrus.Infof("crds.CreateFeatureCRD ")
@@ -161,17 +161,17 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 	}
 	logrus.Infof("features.Auth.Enabled() :", features.Auth.Enabled())
 	// 9、判断是否开启多租户功能
-	if features.Auth.Enabled() {
-		authServer, err = auth.NewServer(ctx, restConfig)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		authServer, err = auth.NewAlwaysAdmin()
-		if err != nil {
-			return nil, err
-		}
-	}
+	//if features.Auth.Enabled() {
+	authServer, err = auth.NewServer(ctx, restConfig)
+	//	if err != nil {
+	//		return nil, err
+	//	}
+	//} else {
+	//	authServer, err = auth.NewAlwaysAdmin()
+	//	if err != nil {
+	//		return nil, err
+	//	}
+	//}
 	//10、构建steve Kubernetes API Translator,这里并没有构建steveserver.router
 	steve, err := steveserver.New(ctx, restConfig, &steveserver.Options{
 		ServerVersion:   settings.ServerVersion.Get(),
@@ -255,7 +255,7 @@ func (r *Rancher) Start(ctx context.Context) error {
 		if err := dashboarddata.Add(ctx, r.Wrangler, localClusterEnabled(r.opts), r.opts.AddLocal == "false", r.opts.Embedded); err != nil {
 			return err
 		}
-		//4、注册相关的资源监听
+		//4、注册dashboard相关的controller
 		if err := r.Wrangler.StartWithTransaction(ctx, func(ctx context.Context) error { return dashboard.Register(ctx, r.Wrangler, r.opts.Embedded) }); err != nil {
 			return err
 		}

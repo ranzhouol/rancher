@@ -98,6 +98,7 @@ func FromContext(ctx context.Context) (*User, bool) {
 	return u, ok
 }
 
+// 做日志审计的功能
 func newAuditLog(writer *LogWriter, req *http.Request, keysToConcealRegex *regexp.Regexp) (*auditLog, error) {
 	auditLog := &auditLog{
 		writer: writer,

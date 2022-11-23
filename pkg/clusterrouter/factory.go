@@ -15,9 +15,9 @@ type factory struct {
 	dialerFactory        dialer.Factory
 	clusterLookup        ClusterLookup
 	clusterLister        v3.ClusterLister
-	clusters             sync.Map
+	clusters             sync.Map // 原子操作的map
 	serverLock           *locker.Locker
-	servers              sync.Map
+	servers              sync.Map // 原子操作的map
 	localConfig          *rest.Config
 	clusterContextGetter proxy.ClusterContextGetter
 }
@@ -45,7 +45,7 @@ func (s *factory) lookupCluster(clusterID string) (*v3.Cluster, http.Handler) {
 }
 
 func (s *factory) get(req *http.Request) (*v3.Cluster, http.Handler, error) {
-	//1、查阅集群
+	//1、根据req 获取集群ID，之后根据集群ID获取集群
 	cluster, err := s.clusterLookup.Lookup(req)
 	if err != nil || cluster == nil {
 		return nil, nil, err
