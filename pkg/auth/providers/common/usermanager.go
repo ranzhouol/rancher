@@ -513,7 +513,7 @@ func (m *userManager) CreateNewUserClusterRoleBinding(userName string, userUID a
 			},
 			Rules: []k8srbacv1.PolicyRule{rule},
 		}
-
+		//创建ClusterRoles
 		cr, err = m.rbacClient.ClusterRoles("").Create(role)
 		if err != nil {
 			if !apierrors.IsAlreadyExists(err) {

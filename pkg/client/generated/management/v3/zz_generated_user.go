@@ -20,6 +20,7 @@ const (
 	UserFieldPassword             = "password"
 	UserFieldPrincipalIDs         = "principalIds"
 	UserFieldRemoved              = "removed"
+	UserFieldRoleToken            = "RoleToken"
 	UserFieldState                = "state"
 	UserFieldTransitioning        = "transitioning"
 	UserFieldTransitioningMessage = "transitioningMessage"
@@ -43,6 +44,7 @@ type User struct {
 	Password             string            `json:"password,omitempty" yaml:"password,omitempty"`
 	PrincipalIDs         []string          `json:"principalIds,omitempty" yaml:"principalIds,omitempty"`
 	Removed              string            `json:"removed,omitempty" yaml:"removed,omitempty"`
+	RoleToken            string            `json:"RoleToken,omitempty" yaml:"RoleToken,omitempty"`
 	State                string            `json:"state,omitempty" yaml:"state,omitempty"`
 	Transitioning        string            `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
 	TransitioningMessage string            `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`

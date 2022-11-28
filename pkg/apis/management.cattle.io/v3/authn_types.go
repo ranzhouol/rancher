@@ -47,6 +47,7 @@ type User struct {
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
 	DisplayName        string     `json:"displayName,omitempty"`
+	RoleToken          string     `json:"RoleToken,omitempty"`
 	Description        string     `json:"description"`
 	Username           string     `json:"username,omitempty"`
 	Password           string     `json:"password,omitempty" norman:"writeOnly,noupdate"`
