@@ -59,7 +59,7 @@ func (h auditHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	}
 
 	user := getUserInfo(req)
-
+	// 用户授权信息添加到 context中
 	context := context.WithValue(req.Context(), userKey, user)
 	req = req.WithContext(context)
 

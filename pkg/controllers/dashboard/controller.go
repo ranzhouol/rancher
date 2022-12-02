@@ -19,6 +19,7 @@ import (
 
 func Register(ctx context.Context, wrangler *wrangler.Context, embedded bool) error {
 	//helm.Register(ctx, wrangler)
+	// kubernetesprovider 监听事件
 	kubernetesprovider.Register(ctx,
 		wrangler.Mgmt.Cluster(),
 		wrangler.K8s,
@@ -48,7 +49,7 @@ func Register(ctx context.Context, wrangler *wrangler.Context, embedded bool) er
 	if features.ProvisioningV2.Enabled() || features.MCM.Enabled() {
 		clusterregistrationtoken.Register(ctx, wrangler)
 	}
-
+	//
 	if features.ProvisioningV2.Enabled() {
 		clusterindex.Register(ctx, wrangler)
 		if err := provisioningv2.Register(ctx, wrangler); err != nil {

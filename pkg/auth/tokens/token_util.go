@@ -58,12 +58,14 @@ func IsExpired(token v3.Token) bool {
 	return durationElapsed.Seconds() >= ttlDuration.Seconds()
 }
 
+// 认证信息放在cookie /请求头中
 func GetTokenAuthFromRequest(req *http.Request) string {
 	var tokenAuthValue string
 	authHeader := req.Header.Get(AuthHeaderName)
-	authHeader = strings.TrimSpace(authHeader)
+	authHeader = strings.TrimSpace(authHeader) // 去除两头空格
 
 	if authHeader != "" {
+		// 1、获取授权凭证
 		parts := strings.SplitN(authHeader, " ", 2)
 		if strings.EqualFold(parts[0], AuthValuePrefix) {
 			if len(parts) > 1 {

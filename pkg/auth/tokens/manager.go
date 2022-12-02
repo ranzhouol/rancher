@@ -92,6 +92,7 @@ func userPrincipalIndexer(obj interface{}) ([]string, error) {
 }
 
 // createDerivedToken will create a jwt token for the authenticated user
+// 创建JWT 令牌 为授权用户
 func (m *Manager) createDerivedToken(jsonInput clientv3.Token, tokenAuthValue string) (v3.Token, string, int, error) {
 	logrus.Debug("Create Derived Token Invoked")
 
@@ -99,7 +100,7 @@ func (m *Manager) createDerivedToken(jsonInput clientv3.Token, tokenAuthValue st
 	if err != nil {
 		return v3.Token{}, "", 401, err
 	}
-
+	//验证过期时间
 	tokenTTL, err := ValidateMaxTTL(time.Duration(int64(jsonInput.TTLMillis)) * time.Millisecond)
 	if err != nil {
 		return v3.Token{}, "", 500, fmt.Errorf("error validating max-ttl %v", err)
@@ -107,15 +108,16 @@ func (m *Manager) createDerivedToken(jsonInput clientv3.Token, tokenAuthValue st
 
 	var unhashedTokenKey string
 	derivedToken := v3.Token{
-		UserPrincipal: token.UserPrincipal,
+		UserPrincipal: token.UserPrincipal, // jwt中的主体
 		IsDerived:     true,
-		TTLMillis:     tokenTTL.Milliseconds(),
+		TTLMillis:     tokenTTL.Milliseconds(), // 过期时间
 		UserID:        token.UserID,
 		AuthProvider:  token.AuthProvider,
 		ProviderInfo:  token.ProviderInfo,
 		Description:   jsonInput.Description,
 		ClusterName:   jsonInput.ClusterID,
 	}
+	// 创建派生token
 	derivedToken, unhashedTokenKey, err = m.createToken(&derivedToken)
 
 	return derivedToken, unhashedTokenKey, 0, err

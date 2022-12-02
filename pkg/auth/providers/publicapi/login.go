@@ -118,7 +118,7 @@ func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, st
 		logrus.Errorf("unmarshal failed with error: %v", err)
 		return v3.Token{}, "", "", httperror.NewAPIError(httperror.InvalidBodyContent, "")
 	}
-	// 3、获取对饮搞得类型和描述
+	// 3、获取类型和描述
 	responseType := generic.ResponseType
 	description := generic.Description
 	ttl := generic.TTLMillis
@@ -192,7 +192,7 @@ func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, st
 		err = saml.PerformSamlLogin(providerName, request, input)
 		return v3.Token{}, "", "saml", err
 	}
-	//6、构建上下文
+	//6、构建上下文，验证用户名和密码
 	ctx := context.WithValue(request.Request.Context(), util.RequestKey, request.Request)
 	userPrincipal, groupPrincipals, providerToken, err = providers.AuthenticateUser(ctx, input, providerName)
 	if err != nil {
@@ -203,7 +203,7 @@ func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, st
 	if displayName == "" {
 		displayName = userPrincipal.LoginName
 	}
-	//7、获取当前用户
+	//7、再次验证用户，并绑定相应的角色
 	currUser, err := h.userMGR.EnsureUser(userPrincipal.Name, displayName)
 	if err != nil {
 		return v3.Token{}, "", "", err

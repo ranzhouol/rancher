@@ -105,7 +105,7 @@ func (l *Provider) AuthenticateUser(ctx context.Context, input interface{}) (v3.
 	if !ok {
 		return v3.Principal{}, nil, "", httperror.NewAPIError(httperror.ServerError, "Unexpected input type")
 	}
-
+	// 1、获取用户名和密码
 	username := localInput.Username
 	pwd := localInput.Password
 
@@ -118,12 +118,12 @@ func (l *Provider) AuthenticateUser(ctx context.Context, input interface{}) (v3.
 		logrus.Debugf("Get User [%s] failed during Authentication: %v", username, err)
 		return v3.Principal{}, nil, "", authFailedError
 	}
-
+	// 2、验证密码
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(pwd)); err != nil {
 		logrus.Debugf("Authentication failed for User [%s]: %v", username, err)
 		return v3.Principal{}, nil, "", authFailedError
 	}
-
+	// 3、生成principalID 、userPrincipal
 	principalID := getLocalPrincipalID(user)
 	userPrincipal := l.toPrincipal("user", user.DisplayName, user.Username, principalID, nil)
 	userPrincipal.Me = true

@@ -11,6 +11,7 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/request"
 )
 
+//认证过滤器
 func NewAuthenticatedFilter(next http.Handler) http.Handler {
 	return &authHeaderHandler{
 		next: next,
@@ -22,6 +23,7 @@ type authHeaderHandler struct {
 }
 
 func (h authHeaderHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+	//1、获取用户信息，认证标识
 	userInfo, authed := request.UserFrom(req.Context())
 	// checking for system:cattle:error user keeps the old behavior of always returning 401 when authentication fails
 	if !authed || userInfo.GetName() == "system:cattle:error" {
@@ -30,6 +32,7 @@ func (h authHeaderHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) 
 	}
 
 	//clean extra that is not part of userInfo
+	//
 	for header := range req.Header {
 		if strings.HasPrefix(header, "Impersonate-Extra-") {
 			key := strings.TrimPrefix(header, "Impersonate-Extra-")
@@ -64,6 +67,7 @@ func (h authHeaderHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) 
 	h.next.ServeHTTP(rw, req)
 }
 
+//带条件的认证过滤器
 func NewRequireAuthenticatedFilter(pathPrefix string, ignorePrefix ...string) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return &authedFilter{
@@ -80,6 +84,7 @@ type authedFilter struct {
 	ignorePrefix []string
 }
 
+//验证是否是需要认证的path
 func (h authedFilter) matches(path string) bool {
 	if strings.HasPrefix(path, h.pathPrefix) {
 		for _, prefix := range h.ignorePrefix {
@@ -94,6 +99,7 @@ func (h authedFilter) matches(path string) bool {
 
 func (h authedFilter) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	if h.matches(req.URL.Path) {
+		// 1、获取用户信息，授权标识
 		userInfo, authed := request.UserFrom(req.Context())
 		// checking for system:cattle:error user keeps the old behavior of always returning 401 when authentication fails
 		if !authed || userInfo.GetName() == "system:cattle:error" {

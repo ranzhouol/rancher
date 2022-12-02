@@ -125,9 +125,11 @@ func router(ctx context.Context, localClusterEnabled bool, tunnelAuthorizer *mcm
 	// Authenticated routes
 	authed := mux.NewRouter()
 	authed.UseEncodedPath()
+	// 进行权限认证
 	authed.Use(mux.MiddlewareFunc(auth.ToMiddleware(requests.NewImpersonatingAuth(sar.NewSubjectAccessReview(clusterManager)))))
 	authed.Use(mux.MiddlewareFunc(rbac.NewAccessControlHandler()))
-	authed.Use(requests.NewAuthenticatedFilter)
+	// 验证用户是否被授权
+	authed.Use(requests.NewAuthenticatedFilter) //  添加认证过滤器
 
 	authed.Path("/meta/{resource:aks.+}").Handler(aks.NewAKSHandler(scaledContext))
 	authed.Path("/meta/{resource:gke.+}").Handler(gke.NewGKEHandler(scaledContext))

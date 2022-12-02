@@ -210,7 +210,7 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 	// 13、构建rancher
 	return &Rancher{
 		Auth: authServer.Authenticator.Chain(
-			auditFilter),
+			auditFilter), // 审计
 		Handler: responsewriter.Chain{ // rancher的处理链
 			auth.SetXAPICattleAuthHeader,      // 授权检测
 			responsewriter.ContentTypeOptions, // 添加请求头 X-Content-Type-Options
@@ -222,7 +222,7 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 			wranglerContext.MultiClusterManager.Middleware,
 			authServer.Management,
 			additionalAPI,
-			requests.NewRequireAuthenticatedFilter("/v1/", "/v1/management.cattle.io.setting"),
+			requests.NewRequireAuthenticatedFilter("/v1/", "/v1/management.cattle.io.setting"), //认证过滤器2
 		}.Handler(steve), //Handler 方式是封装的middlewares 用于加载http的middlewares 这里返回的是一个http.Handler，需要注意的是调佣先后
 		Wrangler:   wranglerContext,
 		Steve:      steve,
@@ -255,7 +255,7 @@ func (r *Rancher) Start(ctx context.Context) error {
 		if err := dashboarddata.Add(ctx, r.Wrangler, localClusterEnabled(r.opts), r.opts.AddLocal == "false", r.opts.Embedded); err != nil {
 			return err
 		}
-		//4、注册dashboard相关的controller
+		//4、注册dashboard相关的controller 很多controller
 		if err := r.Wrangler.StartWithTransaction(ctx, func(ctx context.Context) error { return dashboard.Register(ctx, r.Wrangler, r.opts.Embedded) }); err != nil {
 			return err
 		}

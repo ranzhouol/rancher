@@ -78,7 +78,7 @@ func run(systemChartPath, chartPath string, imagesFromArgs []string) error {
 	if err != nil {
 		return err
 	}
-
+	// 获取相关数据
 	linuxInfo, windowsInfo := kd.GetK8sVersionInfo(
 		rancherVersion,
 		data.K8sVersionRKESystemImages,

@@ -120,7 +120,7 @@ func newPrivateAPI(ctx context.Context, scaledContext *config.ScaledContext) (*m
 
 	root := mux.NewRouter()
 	root.UseEncodedPath()
-	root.Use(requests.NewAuthenticatedFilter)
+	root.Use(requests.NewAuthenticatedFilter) // 添加认证过滤器
 	root.PathPrefix("/v3/identit").Handler(tokenAPI)
 	root.PathPrefix("/v3/token").Handler(tokenAPI)
 	root.PathPrefix("/v3/authConfig").Handler(otherAPIs)
