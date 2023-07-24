@@ -51,6 +51,7 @@ type User struct {
 	Description        string     `json:"description"`
 	Username           string     `json:"username,omitempty"`
 	Password           string     `json:"password,omitempty" norman:"writeOnly,noupdate"`
+	EdgespherePW       string     `json:"edgespherePW,omitempty" norman:"writeOnly,noupdate"` //用于存储密码
 	MustChangePassword bool       `json:"mustChangePassword,omitempty"`
 	PrincipalIDs       []string   `json:"principalIds,omitempty" norman:"type=array[reference[principal]]"`
 	Me                 bool       `json:"me,omitempty" norman:"nocreate,noupdate"`

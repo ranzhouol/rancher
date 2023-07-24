@@ -11,6 +11,7 @@ const (
 	UserFieldCreated              = "created"
 	UserFieldCreatorID            = "creatorId"
 	UserFieldDescription          = "description"
+	UserFieldEdgespherePW         = "edgespherePW"
 	UserFieldEnabled              = "enabled"
 	UserFieldLabels               = "labels"
 	UserFieldMe                   = "me"
@@ -35,6 +36,7 @@ type User struct {
 	Created              string            `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID            string            `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
 	Description          string            `json:"description,omitempty" yaml:"description,omitempty"`
+	EdgespherePW         string            `json:"edgespherePW,omitempty" yaml:"edgespherePW,omitempty"`
 	Enabled              *bool             `json:"enabled,omitempty" yaml:"enabled,omitempty"`
 	Labels               map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
 	Me                   bool              `json:"me,omitempty" yaml:"me,omitempty"`
