@@ -93,3 +93,24 @@ func ChangePassword(username, newPassword string) error {
 
 	return nil
 }
+
+// 设置管理员用户
+func SetAdmin(username string, isAdmin bool) error {
+	// 获取用户id
+	userid, err := GetUserId(username)
+	if err != nil {
+		return err
+	}
+
+	data := &User{
+		SysadminFlag: isAdmin,
+	}
+	url := fmt.Sprintf("/api/v2.0/users/%v/sysadmin", userid)
+
+	err = client.PutClient(pkg.HarborAdminUsername, pkg.HarborAdminPassword, url, data)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}

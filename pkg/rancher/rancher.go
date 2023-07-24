@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
+	"github.com/rancher/rancher/pkg/k8sproxy/harborproxy/pkg"
+	harboruser "github.com/rancher/rancher/pkg/k8sproxy/harborproxy/pkg/user"
 	"net/http"
 	"os"
 	"strings"
@@ -329,6 +331,9 @@ func (r *Rancher) ListenAndServe(ctx context.Context) error {
 
 	// 在karmada host平台创建token secret
 	go createKarmadaToken(r.Wrangler.K8s)
+
+	// 创建 harbor admin-edgesphere 用户
+	go createHarborEdgesphereAdmin()
 
 	if err := tls.ListenAndServe(ctx, r.Wrangler.RESTConfig,
 		r.Auth(r.Handler),
@@ -784,4 +789,25 @@ func createKarmadaToken(client kubernetes.Interface) {
 		return
 	}
 	logrus.Infof("secret: %v 创建成功", karmadaSecretName)
+}
+
+// 创建 harbor admin-edgesphere 用户
+func createHarborEdgesphereAdmin() {
+	logrus.Info("初始化制品库")
+	username := pkg.HarborEdgesphereAdmin
+	//password := pkg.HarborAdminPassword
+	password := "Harbor12345"
+	email := username + "@email.com"
+
+	// 创建 harbor 用户
+	if err := harboruser.Create(username, password, email, username); err != nil {
+		logrus.Errorf("创建制品库用户%v失败: %v", username, err.Error())
+	}
+
+	// 设置为管理员
+	if err := harboruser.SetAdmin(username, true); err != nil {
+		logrus.Errorf("设置制品库管理员%v失败: %v", username, err.Error())
+		return
+	}
+	logrus.Info("初始化制品库成功")
 }

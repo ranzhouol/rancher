@@ -5,6 +5,7 @@ const (
 	//HarborHost = "https://harbor-core.harbor.svc.cluster.local:443"
 
 	// harbor admin
-	HarborAdminUsername = "admin"
-	HarborAdminPassword = "1qaz2wsx3edc"
+	HarborAdminUsername   = "admin"
+	HarborEdgesphereAdmin = "admin-edgesphere"
+	HarborAdminPassword   = "1qaz2wsx3edc"
 )
