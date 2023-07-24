@@ -61,6 +61,7 @@ func Register(ctx context.Context, management *config.ManagementContext, manager
 	restrictedadminrbac.Register(ctx, management, wrangler)
 	settings.Register(ctx, management)
 	managementlegacy.Register(ctx, management, manager)
+	//harboruser.Register(ctx, management)
 
 	// Ensure caches are available for user controllers, these are used as part of
 	// registration

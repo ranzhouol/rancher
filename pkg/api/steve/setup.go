@@ -2,7 +2,6 @@ package steve
 
 import (
 	"context"
-
 	"github.com/rancher/rancher/pkg/api/steve/catalog"
 	"github.com/rancher/rancher/pkg/api/steve/clusters"
 	"github.com/rancher/rancher/pkg/api/steve/disallow"

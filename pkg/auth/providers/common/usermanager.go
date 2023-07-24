@@ -235,6 +235,7 @@ func (m *userManager) EnsureToken(input user.TokenInput) (string, error) {
 }
 
 func (m *userManager) EnsureClusterToken(clusterName string, input user.TokenInput) (string, error) {
+	logrus.Infof("hhhhhh")
 	if strings.HasPrefix(input.TokenName, "token-") {
 		return "", errors.New("token names can't start with token-")
 	}

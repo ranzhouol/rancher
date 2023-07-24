@@ -5,7 +5,6 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rancher/apiserver/pkg/parse"
-	"github.com/rancher/apiserver/pkg/urlbuilder"
 	"github.com/rancher/rancher/pkg/api/norman"
 	"github.com/rancher/rancher/pkg/api/norman/customization/aks"
 	"github.com/rancher/rancher/pkg/api/norman/customization/clusterregistrationtokens"
@@ -24,7 +23,8 @@ import (
 	rancherdialer "github.com/rancher/rancher/pkg/dialer"
 	"github.com/rancher/rancher/pkg/httpproxy"
 	k8sProxyPkg "github.com/rancher/rancher/pkg/k8sproxy"
-	"github.com/rancher/rancher/pkg/karmadaproxy"
+	harborproxy "github.com/rancher/rancher/pkg/k8sproxy/harborproxy"
+	karmadaproxy2 "github.com/rancher/rancher/pkg/k8sproxy/karmadaproxy"
 	"github.com/rancher/rancher/pkg/metrics"
 	"github.com/rancher/rancher/pkg/multiclustermanager/whitelist"
 	"github.com/rancher/rancher/pkg/pipeline/hooks"
@@ -61,7 +61,8 @@ func router(ctx context.Context, localClusterEnabled bool, tunnelAuthorizer *mcm
 		connectHandler       = scaledContext.Dialer.(*rancherdialer.Factory).TunnelServer
 		connectConfigHandler = rkenodeconfigserver.Handler(tunnelAuthorizer, scaledContext)
 		clusterImport        = clusterregistrationtokens.ClusterImport{Clusters: scaledContext.Management.Clusters("")}
-		karmadaProxy         = karmadaproxy.NewKarmadaJoinProxy(scaledContext)
+		karmadaProxy         = karmadaproxy2.NewKarmadaJoinProxy(scaledContext)
+		harborProxy          = harborproxy.NewHarborProxy()
 	)
 	managerContext = scaledContext
 	tokenAPI, err := tokens.NewAPIHandler(ctx, scaledContext, norman.ConfigureAPIUI)
@@ -91,16 +92,26 @@ func router(ctx context.Context, localClusterEnabled bool, tunnelAuthorizer *mcm
 	// Unauthenticated routes
 	unauthed := mux.NewRouter()
 	unauthed.UseEncodedPath()
-	unauthed.Use(urlbuilder.RedirectRewrite)
+	//unauthed.Use(urlbuilder.RedirectRewrite)
 
 	matchV1Karmada := func(r *http.Request, match *mux.RouteMatch) bool {
-		if strings.HasPrefix(r.URL.Path, "/cluster.karmada.io") || strings.HasPrefix(r.URL.Path, "/policy.karmada.io") {
+		if strings.HasPrefix(r.URL.Path, "/karmada") {
 			logrus.Infof(" multiclustermanager  matchV1Karmada  URL %s ", r.URL.Path)
 			match.Vars = map[string]string{"name": "v1/karmada"}
 			return true
 		}
 		return false
 	}
+
+	// harbor
+	//matchV1Harbor := func(r *http.Request, match *mux.RouteMatch) bool {
+	//	if strings.HasPrefix(r.URL.Path, "/harbor") {
+	//		logrus.Infof(" matchV1Harbor  URL %s ", r.URL.Path)
+	//		match.Vars = map[string]string{"name": "v1/harbor"}
+	//		return true
+	//	}
+	//	return false
+	//}
 
 	unauthed.Path("/").MatcherFunc(parse.MatchNotBrowser).Handler(managementAPI)
 	unauthed.Handle("/v3/connect/config", connectConfigHandler)
@@ -120,7 +131,10 @@ func router(ctx context.Context, localClusterEnabled bool, tunnelAuthorizer *mcm
 	unauthed.PathPrefix("/v1-saml").Handler(saml.AuthHandler())
 	unauthed.PathPrefix("/v3-public").Handler(publicAPI)
 	// karmada routes
-	unauthed.MatcherFunc(matchV1Karmada).HandlerFunc(karmadaproxy.ProxyRequestHandler(karmadaProxy))
+	unauthed.HandleFunc("/multicluster/cluster.karmada.io/v1alpha1/clusters/pull", karmadaproxy2.NewKarmadaPullJoinHandler).MatcherFunc(onlyGet)
+	unauthed.MatcherFunc(matchV1Karmada).HandlerFunc(karmadaproxy2.ProxyRequestHandler(karmadaProxy))
+	// harbor routes
+	//unauthed.MatcherFunc(matchV1Harbor).HandlerFunc(harborproxy.ProxyRequestHandler(harborProxy))
 
 	// Authenticated routes
 	authed := mux.NewRouter()
@@ -144,6 +158,8 @@ func router(ctx context.Context, localClusterEnabled bool, tunnelAuthorizer *mcm
 	authed.PathPrefix("/v3/identit").Handler(tokenAPI)
 	authed.PathPrefix("/v3/token").Handler(tokenAPI)
 	authed.PathPrefix("/v3").Handler(managementAPI)
+	// harbor routes
+	authed.PathPrefix("/harbor").HandlerFunc(harborproxy.ProxyRequestHandler(harborProxy))
 
 	unauthed.NotFoundHandler = authed
 	return func(next http.Handler) http.Handler {

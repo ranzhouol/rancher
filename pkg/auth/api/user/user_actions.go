@@ -1,7 +1,10 @@
 package user
 
 import (
+	harboruser "github.com/rancher/rancher/pkg/k8sproxy/harborproxy/pkg/user"
+	"github.com/sirupsen/logrus"
 	"net/http"
+	"regexp"
 	"strings"
 	"unicode/utf8"
 
@@ -115,6 +118,11 @@ func (h *Handler) changePassword(actionName string, action *types.Action, reques
 		return err
 	}
 
+	// 更新harbor密码
+	if err = harboruser.ChangePassword(user.Username, newPass); err != nil {
+		logrus.Errorf("制品库用户%v, 更新失败:%v", user.Username, err.Error())
+	}
+
 	return nil
 }
 
@@ -158,6 +166,11 @@ func (h *Handler) setPassword(actionName string, action *types.Action, request *
 	}
 
 	request.WriteResponse(http.StatusOK, userData)
+
+	// 更新harbor密码
+	if err = harboruser.ChangePassword(username, newPass); err != nil {
+		logrus.Errorf("制品库用户%v, 更新失败:%v", username, err.Error())
+	}
 	return nil
 }
 
@@ -184,8 +197,11 @@ func (h *Handler) userCanRefresh(request *types.APIContext) bool {
 
 // validatePassword will ensure a password is at least the minimum required length in runes, and that the username and password do not match.
 func validatePassword(user string, pass string, minPassLen int) error {
-	if utf8.RuneCountInString(pass) < minPassLen {
-		return errors.Errorf("Password must be at least %v characters", minPassLen)
+	hasLower := regexp.MustCompile(`[a-z]`)
+	hasUpper := regexp.MustCompile(`[A-Z]`)
+	hasNumber := regexp.MustCompile(`[0-9]`)
+	if utf8.RuneCountInString(pass) < minPassLen || !(hasLower.MatchString(pass) && hasUpper.MatchString(pass) && hasNumber.MatchString(pass)) {
+		return errors.Errorf("Password must be at least %v characters with at least 1 uppercase letter, 1 lowercase letter and 1 number", minPassLen)
 	}
 
 	if user == pass {
@@ -193,4 +209,27 @@ func validatePassword(user string, pass string, minPassLen int) error {
 	}
 
 	return nil
+}
+
+func validateUsername(username string) error {
+	maxPasslen := 255
+	if utf8.RuneCountInString(username) > maxPasslen {
+		return errors.Errorf("Username must be at most %v characters", maxPasslen)
+	}
+
+	illegalChar := []string{",", "~", "#", "$", "%"}
+	if IsContainIllegalChar(username, illegalChar) {
+		return errors.Errorf("Username contains illegal characters: %v", illegalChar)
+	}
+	return nil
+}
+
+// IsContainIllegalChar ...
+func IsContainIllegalChar(s string, illegalChar []string) bool {
+	for _, c := range illegalChar {
+		if strings.Contains(s, c) {
+			return true
+		}
+	}
+	return false
 }

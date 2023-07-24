@@ -1,6 +1,7 @@
 package user
 
 import (
+	harboruser "github.com/rancher/rancher/pkg/k8sproxy/harborproxy/pkg/user"
 	"strings"
 	"sync"
 	"time"
@@ -19,7 +20,10 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
-const userByUsernameIndex = "auth.management.cattle.io/user-by-username"
+const (
+	userByUsernameIndex    = "auth.management.cattle.io/user-by-username"
+	userByDescriptionIndex = "auth.management.cattle.io/user-by-description"
+)
 
 type userStore struct {
 	types.Store
@@ -31,7 +35,8 @@ type userStore struct {
 func SetUserStore(schema *types.Schema, mgmt *config.ScaledContext) {
 	userInformer := mgmt.Management.Users("").Controller().Informer()
 	userIndexers := map[string]cache.IndexFunc{
-		userByUsernameIndex: userByUsername,
+		userByUsernameIndex:    userByUsername,
+		userByDescriptionIndex: userByDescription,
 	}
 	userInformer.AddIndexers(userIndexers)
 
@@ -85,6 +90,15 @@ func userByUsername(obj interface{}) ([]string, error) {
 	return []string{u.Username}, nil
 }
 
+func userByDescription(obj interface{}) ([]string, error) {
+	u, ok := obj.(*v3.User)
+	if !ok {
+		return []string{}, nil
+	}
+
+	return []string{u.Description}, nil
+}
+
 func hashPassword(data map[string]interface{}) error {
 	pass, ok := data[client.UserFieldPassword].(string)
 	if !ok {
@@ -116,6 +130,14 @@ func (s *userStore) Create(apiContext *types.APIContext, schema *types.Schema, d
 	password, ok := data[client.UserFieldPassword].(string)
 	if !ok {
 		return nil, errors.New("invalid password")
+	}
+
+	if err := s.validateDescription(data); err != nil {
+		return nil, err
+	}
+
+	if err := validateUsername(username); err != nil {
+		return nil, httperror.NewAPIError(httperror.InvalidBodyContent, err.Error())
 	}
 
 	if err := validatePassword(username, password, settings.PasswordMinLength.GetInt()); err != nil {
@@ -171,7 +193,32 @@ Tries:
 
 	delete(created, client.UserFieldPassword)
 
+	// 创建 harbor 用户
+	if err := harboruser.Create(username, password, username+"@qq.com", username); err != nil {
+		logrus.Errorf("创建harbor用户%v失败: %v", username, err.Error())
+	}
+	//created["annotations"].(map[string]interface{})["edgesphere/harbor-users"] = "true"
+	//logrus.Info("创建4的created: ", created)
 	return created, nil
+}
+
+func (s *userStore) validateDescription(data map[string]interface{}) error {
+	description, ok := data[client.UserFieldDescription].(string)
+	if !ok {
+		return errors.New("invalid description")
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	users, err := s.userIndexer.ByIndex(userByDescriptionIndex, description)
+	if err != nil {
+		return err
+	}
+	if len(users) > 0 {
+		return httperror.NewFieldAPIError(httperror.NotUnique, "description", "Description is already in use.")
+	}
+	return nil
 }
 
 func (s *userStore) create(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}) (map[string]interface{}, error) {

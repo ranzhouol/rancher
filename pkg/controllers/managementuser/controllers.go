@@ -2,6 +2,7 @@ package managementuser
 
 import (
 	"context"
+	"github.com/rancher/rancher/pkg/controllers/managementuser/watchnamespace"
 
 	"github.com/rancher/rancher/pkg/controllers/managementlegacy/compose/common"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/certsexpiration"
@@ -37,6 +38,7 @@ func Register(ctx context.Context, cluster *config.UserContext, clusterRec *mana
 	certsexpiration.Register(ctx, cluster)
 	windows.Register(ctx, clusterRec, cluster)
 	nsserviceaccount.Register(ctx, cluster)
+	watchnamespace.Register(ctx, cluster)
 	if features.RKE2.Enabled() {
 		if err := snapshotbackpopulate.Register(ctx, cluster); err != nil {
 			return err

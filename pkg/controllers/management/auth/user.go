@@ -2,6 +2,7 @@ package auth
 
 import (
 	"fmt"
+	harboruser "github.com/rancher/rancher/pkg/k8sproxy/harborproxy/pkg/user"
 	"strings"
 
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -47,6 +48,8 @@ const (
 	grbByUserRefKey   = "auth.management.cattle.io/grb-by-user-ref"
 	tokenByUserRefKey = "auth.management.cattle.io/token-by-user-ref"
 	userController    = "mgmt-auth-users-controller"
+	// harbor
+	harborUserController = "edgesphere-harbor-users"
 )
 
 func newUserLifecycle(management *config.ManagementContext, clusterManager *clustermanager.Manager) *userLifecycle {
@@ -145,8 +148,31 @@ func (l *userLifecycle) Create(user *v3.User) (runtime.Object, error) {
 		user = u.(*v3.User)
 	}
 
+	//logrus.Info("测试 user.ObjectMeta.Annotations: ", user.ObjectMeta.Annotations)
+	//logrus.Info("测试 user: ", user)
+	//// create harbor user
+	//if user.ObjectMeta.Annotations[harborUserController] == "" {
+	//	err := HarborCreateUser(user.Username, user.Password, user.Username+"@qq.com", user.Username)
+	//	if err != nil {
+	//		logrus.Errorf("创建 harbor 用户 %s 失败:%s", user.Username, err.Error())
+	//	} else {
+	//		logrus.Infof("创建 harbor 用户 %s 成功", user.Username)
+	//		user.ObjectMeta.Annotations[harborUserController] = "true"
+	//		logrus.Info("user.Annotations[harborUserController]:", user.ObjectMeta.Annotations)
+	//	}
+	//}
+
 	return user, nil
 }
+
+//func HarborCreateUser(username, password, email, realname string) error {
+//	logrus.Infof("username:%s,password:%s,email:%s,displayname:%s", username, password, email, realname)
+//	err := harboruser.Create(username, password, email, realname)
+//	if err != nil {
+//		return err
+//	}
+//	return nil
+//}
 
 func (l *userLifecycle) Updated(user *v3.User) (runtime.Object, error) {
 	err := l.userManager.CreateNewUserClusterRoleBinding(user.Name, user.UID)
@@ -157,6 +183,17 @@ func (l *userLifecycle) Updated(user *v3.User) (runtime.Object, error) {
 }
 
 func (l *userLifecycle) Remove(user *v3.User) (runtime.Object, error) {
+	logrus.Info("删除用户:", user.Username)
+	// 删除harbor用户
+	if userid, err := harboruser.GetUserId(user.Username); err != nil {
+		logrus.Error(err.Error())
+	} else {
+		err := harboruser.Delete(userid)
+		if err != nil {
+			logrus.Errorf("制品库用户%v,id%v,删除失败:%v", user.Username, userid, err.Error())
+		}
+	}
+
 	clusterRoles, err := l.getCRTBByUserName(user.Name)
 	if err != nil {
 		return nil, err

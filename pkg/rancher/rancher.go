@@ -4,9 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/hashicorp/go-multierror"
@@ -29,6 +31,7 @@ import (
 	dashboarddata "github.com/rancher/rancher/pkg/data/dashboard"
 	"github.com/rancher/rancher/pkg/features"
 	mgmntv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	util2 "github.com/rancher/rancher/pkg/k8sproxy/karmadaproxy/util"
 	"github.com/rancher/rancher/pkg/multiclustermanager"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/settings"
@@ -55,7 +58,18 @@ import (
 	"k8s.io/client-go/util/retry"
 )
 
-const encryptionConfigUpdate = "provisioner.cattle.io/encrypt-migrated"
+const (
+	encryptionConfigUpdate = "provisioner.cattle.io/encrypt-migrated"
+
+	// karmadaSecretName is the name of the secret on karmada host platform
+	karmadaSecretName = "karmada-dashboard-token"
+
+	// karmadaSecretNamespace is the name of the Namespace in which secret resides
+	karmadaSecretNamespace = "karmada-system"
+
+	// karmadaServiceAccount is the name of the karmada-dashboard's ServiceAccount
+	karmadaServiceAccount = "karmada-dashboard"
+)
 
 type Options struct {
 	ACMEDomains       cli.StringSlice
@@ -301,6 +315,21 @@ func (r *Rancher) ListenAndServe(ctx context.Context) error {
 	go r.Steve.StartAggregation(ctx)
 	//3、启动ListenAndServe，把所有的handler 都放到http server 中
 	logrus.Infof("StartAggregation ")
+
+	// 首次注册平台
+	//go func() {
+	//	logrus.Infof("首次注册DCNP")
+	//	err := r.dcnpRegister()
+	//	if err != nil {
+	//		logrus.Error(err.Error())
+	//	} else {
+	//		logrus.Infof("DCNP注册完成")
+	//	}
+	//}()
+
+	// 在karmada host平台创建token secret
+	go createKarmadaToken(r.Wrangler.K8s)
+
 	if err := tls.ListenAndServe(ctx, r.Wrangler.RESTConfig,
 		r.Auth(r.Handler),
 		r.opts.BindHost,
@@ -587,4 +616,172 @@ func migrateEncryptionConfig(ctx context.Context, restConfig *rest.Config) error
 		}
 	}
 	return allErrors
+}
+
+func (r *Rancher) dcnpRegister() error {
+	// 更新server-url、first-login、telemetry-opt
+	err := firstLogin(r.Wrangler)
+	if err != nil {
+		return err
+	}
+
+	err = telemetryOpt(r.Wrangler)
+	if err != nil {
+		return err
+	}
+
+	err = serverUrl(r.Wrangler)
+	if err != nil {
+		return err
+	}
+
+	// 创建eula-agreed
+	err = eulaAgreed(r.Wrangler)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func firstLogin(context *wrangler.Context) error {
+	// 获取 first-login
+	firstLoginSetting, err := context.Mgmt.Setting().Get("first-login", metav1.GetOptions{})
+	if err != nil {
+		logrus.Error("无法获取setting：first-login")
+		return err
+	}
+
+	// 更新 first-login
+	if firstLoginSetting.Value == "" {
+		firstLoginSetting.Value = "false"
+		_, err := context.Mgmt.Setting().Update(firstLoginSetting)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func telemetryOpt(context *wrangler.Context) error {
+	// 获取 telemetry-opt
+	telemetryOptSetting, err := context.Mgmt.Setting().Get("telemetry-opt", metav1.GetOptions{})
+	if err != nil {
+		logrus.Error("无法获取setting：telemetry-opt")
+		return err
+	}
+
+	// 更新 telemetry-opt
+	if telemetryOptSetting.Value == "" {
+		telemetryOptSetting.Value = "in"
+		_, err := context.Mgmt.Setting().Update(telemetryOptSetting)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func serverUrl(context *wrangler.Context) error {
+	// 获取 server-url
+	serverUrlSetting, err := context.Mgmt.Setting().Get("server-url", metav1.GetOptions{})
+	if err != nil {
+		logrus.Error("无法获取setting：server-url")
+		return err
+	}
+
+	// 更新 server-url
+	if serverUrlSetting.Value == "" {
+		serverURL := os.Getenv("ServerURL")
+		if serverURL == "" {
+			return errors.New("无法找到环境变量：ServerURL")
+		}
+		serverUrlSetting.Value = "https://" + serverURL
+
+		_, err = context.Mgmt.Setting().Update(serverUrlSetting)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func eulaAgreed(context *wrangler.Context) error {
+	// 获取 eula-agreed
+	_, err := context.Mgmt.Setting().Get("eula-agreed", metav1.GetOptions{})
+	if err != nil {
+		// 创建 eula-agreed
+		var eulaAgreedSetting v3.Setting
+		eulaAgreedSetting.Name = "eula-agreed"
+		eulaAgreedSetting.Kind = "Setting"
+		eulaAgreedSetting.APIVersion = "management.cattle.io/v3"
+		UTCTime := getUTCTime()
+		eulaAgreedSetting.Default = UTCTime
+		eulaAgreedSetting.Value = UTCTime
+
+		_, err := context.Mgmt.Setting().Create(&eulaAgreedSetting)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func getUTCTime() string {
+	t := time.Now().UTC().String()
+	tList := strings.Split(t, " ")
+	t_UTC := tList[0] + "T" + tList[1][:12] + "Z"
+	return t_UTC
+}
+
+func createKarmadaToken(client kubernetes.Interface) {
+	logrus.Infof("createKarmadaToken")
+	karmadaConfig, err := util2.GetKarmadaConfig(client)
+	if err != nil {
+		logrus.Error(err.Error())
+		return
+	}
+	controlPlaneKubeClient := kubernetes.NewForConfigOrDie(karmadaConfig)
+
+	// 判断karmada host平面的secret是否存在
+	ok, err := util2.IfSecretExists(client, karmadaSecretNamespace, karmadaSecretName)
+	if err != nil {
+		logrus.Error(err.Error())
+		return
+	}
+	if ok {
+		logrus.Info("karmadaHost secret 已经存在")
+		return
+	}
+
+	// 获取karmada控制平台上的secret
+	serviceAccount, err := controlPlaneKubeClient.CoreV1().ServiceAccounts(karmadaSecretNamespace).Get(context.TODO(), karmadaServiceAccount, metav1.GetOptions{})
+	if err != nil {
+		logrus.Error(err.Error())
+		return
+	}
+	karmadaControlPlaneSecret, err := util2.GetTargetSecret(controlPlaneKubeClient, serviceAccount.Secrets, v1.SecretTypeServiceAccountToken, karmadaSecretNamespace)
+	if err != nil {
+		logrus.Error(err.Error())
+		return
+	}
+
+	// 创建 karmadaHostPlaneSecret
+	karmadaHostPlaneSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      karmadaSecretName,
+			Namespace: karmadaSecretNamespace,
+		},
+		Data: map[string][]byte{
+			"token": karmadaControlPlaneSecret.Data["token"],
+		},
+	}
+	logrus.Infof("在 karmada Host 平面创建secret")
+	_, err = util2.CreateSecret(client, karmadaHostPlaneSecret)
+	if err != nil {
+		logrus.Error(err.Error())
+		return
+	}
+	logrus.Infof("secret: %v 创建成功", karmadaSecretName)
 }

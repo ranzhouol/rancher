@@ -94,6 +94,7 @@ func (p *prtbLifecycle) syncPRTB(binding *v3.ProjectRoleTemplateBinding) error {
 
 	// Get namespaces belonging to project
 	namespaces, err := p.m.nsIndexer.ByIndex(nsByProjectIndex, binding.ProjectName)
+	//logrus.Infof("***project id: ***", binding.ProjectName)
 	if err != nil {
 		return errors.Wrapf(err, "couldn't list namespaces with project ID %v", binding.ProjectName)
 	}
@@ -108,6 +109,7 @@ func (p *prtbLifecycle) syncPRTB(binding *v3.ProjectRoleTemplateBinding) error {
 
 	for _, n := range namespaces {
 		ns := n.(*v1.Namespace)
+		//logrus.Infof("***命名空间: ***", ns.Name)
 		if !ns.DeletionTimestamp.IsZero() {
 			continue
 		}

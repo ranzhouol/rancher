@@ -29,7 +29,6 @@ func SetNamespaceCondition(namespace *v1.Namespace, d time.Duration, conditionTy
 		return err
 	}
 	annotations[statusAnn] = bAnn
-
 	namespace.ObjectMeta.Annotations = annotations
 
 	return nil

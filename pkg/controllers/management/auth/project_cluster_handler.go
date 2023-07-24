@@ -89,11 +89,13 @@ func (l *projectLifecycle) sync(key string, orig *v3.Project) (runtime.Object, e
 
 	obj := orig.DeepCopyObject()
 
+	// 1. 给project创建namespace
 	obj, err := l.mgr.reconcileResourceToNamespace(obj, projectCreateController)
 	if err != nil {
 		return nil, err
 	}
 
+	// 2. 给project创建RoleTemplateBinding
 	obj, err = l.mgr.reconcileCreatorRTB(obj)
 	if err != nil {
 		return nil, err

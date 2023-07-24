@@ -163,6 +163,7 @@ require (
 	k8s.io/apiserver v0.22.3
 	k8s.io/cli-runtime v0.22.3
 	k8s.io/client-go v12.0.0+incompatible
+	k8s.io/cluster-bootstrap v0.21.4
 	k8s.io/gengo v0.0.0-20201214224949-b6c5ce23f027
 	k8s.io/helm v2.16.7+incompatible
 	k8s.io/klog/v2 v2.10.0

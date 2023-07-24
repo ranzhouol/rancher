@@ -2,12 +2,6 @@ package main
 
 import (
 	"fmt"
-	"log"
-	"net/http"
-	_ "net/http/pprof"
-	"os"
-	"path/filepath"
-
 	"github.com/docker/docker/pkg/reexec"
 	"github.com/ehazlett/simplelog"
 	_ "github.com/rancher/norman/controller"
@@ -19,6 +13,11 @@ import (
 	"github.com/rancher/wrangler/pkg/signals"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
+	"log"
+	"net/http"
+	_ "net/http/pprof"
+	"os"
+	"path/filepath"
 )
 
 var (
@@ -212,7 +211,8 @@ func run(cli *cli.Context, cfg rancher.Options) error {
 	}
 	//1、获取clientConfig 对象，用于访问local集群
 	//kubeConfig := "D:\\code\\go\\src\\github.com\\Momeaking\\rancher\\bin\\rke.yaml"
-	kubeConfig := "D:\\code\\go\\src\\github.com\\Momeaking\\rancher\\bin\\admin.conf"
+	//kubeConfig := "D:\\code\\go\\src\\github.com\\Momeaking\\rancher\\bin\\admin.conf"
+	kubeConfig := "D:\\Go\\Go_WorkSpace\\src\\inspur.com\\linux\\4970\\config"
 	cfg.K8sMode = "external"
 	embedded, clientConfig, err := k8s.GetConfig(ctx, cfg.K8sMode, kubeConfig)
 	if err != nil {

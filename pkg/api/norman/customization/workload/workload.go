@@ -258,6 +258,7 @@ func (h Handler) LinkHandler(apiContext *types.APIContext, next types.RequestHan
 func (a *Config) Formatter(apiContext *types.APIContext, resource *types.RawResource) {
 	workloadID := resource.ID
 	workloadSchema := apiContext.Schemas.Schema(&schema.Version, "workload")
+	//resource.Links["test"] = "test123"
 	resource.Links["self"] = apiContext.URLBuilder.ResourceLinkByID(workloadSchema, workloadID)
 	resource.Links["remove"] = apiContext.URLBuilder.ResourceLinkByID(workloadSchema, workloadID)
 	resource.Links["update"] = apiContext.URLBuilder.ResourceLinkByID(workloadSchema, workloadID)

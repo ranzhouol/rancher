@@ -23,6 +23,7 @@ import (
 
 var (
 	ErrMustAuthenticate = httperror.NewAPIError(httperror.Unauthorized, "must authenticate")
+	CurrUser            = ""
 )
 
 type Authenticator interface {
@@ -44,6 +45,8 @@ func ToAuthMiddleware(a Authenticator) auth.Middleware {
 		if err != nil {
 			return nil, false, err
 		}
+
+		CurrUser = authResp.Extras["username"][0]
 		return &user.DefaultInfo{
 			Name:   authResp.User,
 			UID:    authResp.User,
