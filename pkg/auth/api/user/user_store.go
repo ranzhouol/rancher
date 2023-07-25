@@ -194,11 +194,14 @@ Tries:
 	delete(created, client.UserFieldPassword)
 
 	// 创建 harbor 用户
+	authUsername := apiContext.Request.Header.Get("Impersonate-Extra-Username")
+	logrus.Infof("发送指令用户：%v", authUsername)
 	if err := harboruser.Create(username, password, username+"@qq.com", username); err != nil {
 		logrus.Errorf("创建harbor用户%v失败: %v", username, err.Error())
 	}
 	//created["annotations"].(map[string]interface{})["edgesphere/harbor-users"] = "true"
 	//logrus.Info("创建4的created: ", created)
+
 	return created, nil
 }
 
@@ -269,6 +272,7 @@ func (s *userStore) Delete(apiContext *types.APIContext, schema *types.Schema, i
 		return nil, httperror.NewAPIError(httperror.InvalidAction, "You cannot delete yourself")
 	}
 
+	// 删除harbor用户
 	authUsername := apiContext.Request.Header.Get("Impersonate-Extra-Username")
 	data, err := s.Store.ByID(apiContext, schema, id)
 	if err != nil {
@@ -277,10 +281,10 @@ func (s *userStore) Delete(apiContext *types.APIContext, schema *types.Schema, i
 	username := data["username"]
 	logrus.Infof("发送指令用户：%v", authUsername)
 	logrus.Infof("指令删除用户：%v", username)
-	// 删除harbor用户
 	if err := harboruser.Delete(username.(string)); err != nil {
 		logrus.Errorf("制品库用户 %v, 删除失败: %v", username, err.Error())
 	}
+
 	return s.Store.Delete(apiContext, schema, id)
 }
 

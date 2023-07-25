@@ -120,3 +120,8 @@ func SetAdmin(username string, isAdmin bool) error {
 
 	return nil
 }
+
+// 根据用户名获取密码
+func GetPassword(username string) {
+
+}

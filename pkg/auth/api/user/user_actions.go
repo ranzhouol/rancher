@@ -119,6 +119,8 @@ func (h *Handler) changePassword(actionName string, action *types.Action, reques
 	}
 
 	// 更新harbor密码
+	authUsername := request.Request.Header.Get("Impersonate-Extra-Username")
+	logrus.Infof("发送指令用户：%v", authUsername)
 	if err = harboruser.ChangePassword(user.Username, newPass); err != nil {
 		logrus.Errorf("制品库用户%v, 更新失败:%v", user.Username, err.Error())
 	}
@@ -168,6 +170,8 @@ func (h *Handler) setPassword(actionName string, action *types.Action, request *
 	request.WriteResponse(http.StatusOK, userData)
 
 	// 更新harbor密码
+	authUsername := request.Request.Header.Get("Impersonate-Extra-Username")
+	logrus.Infof("发送指令用户：%v", authUsername)
 	if err = harboruser.ChangePassword(username, newPass); err != nil {
 		logrus.Errorf("制品库用户%v, 更新失败:%v", username, err.Error())
 	}
