@@ -2,7 +2,6 @@ package auth
 
 import (
 	"fmt"
-	harboruser "github.com/rancher/rancher/pkg/k8sproxy/harborproxy/pkg/user"
 	"strings"
 
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -183,17 +182,6 @@ func (l *userLifecycle) Updated(user *v3.User) (runtime.Object, error) {
 }
 
 func (l *userLifecycle) Remove(user *v3.User) (runtime.Object, error) {
-	logrus.Info("删除用户:", user.Username)
-	// 删除harbor用户
-	if userid, err := harboruser.GetUserId(user.Username); err != nil {
-		logrus.Error(err.Error())
-	} else {
-		err := harboruser.Delete(userid)
-		if err != nil {
-			logrus.Errorf("制品库用户%v,id%v,删除失败:%v", user.Username, userid, err.Error())
-		}
-	}
-
 	clusterRoles, err := l.getCRTBByUserName(user.Name)
 	if err != nil {
 		return nil, err

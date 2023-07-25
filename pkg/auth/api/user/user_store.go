@@ -269,6 +269,18 @@ func (s *userStore) Delete(apiContext *types.APIContext, schema *types.Schema, i
 		return nil, httperror.NewAPIError(httperror.InvalidAction, "You cannot delete yourself")
 	}
 
+	authUsername := apiContext.Request.Header.Get("Impersonate-Extra-Username")
+	data, err := s.Store.ByID(apiContext, schema, id)
+	if err != nil {
+		logrus.Error(err.Error())
+	}
+	username := data["username"]
+	logrus.Infof("发送指令用户：%v", authUsername)
+	logrus.Infof("指令删除用户：%v", username)
+	// 删除harbor用户
+	if err := harboruser.Delete(username.(string)); err != nil {
+		logrus.Errorf("制品库用户 %v, 删除失败: %v", username, err.Error())
+	}
 	return s.Store.Delete(apiContext, schema, id)
 }
 

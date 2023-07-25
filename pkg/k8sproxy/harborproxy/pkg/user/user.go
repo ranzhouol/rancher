@@ -66,9 +66,15 @@ func Create(username, password, email, realname string) error {
 	return nil
 }
 
-func Delete(userid int) error {
+func Delete(username string) error {
+	// 获取用户id
+	userid, err := GetUserId(username)
+	if err != nil {
+		return err
+	}
+
 	url := fmt.Sprintf("/api/v2.0/users/%v", userid)
-	err := client.DeleteClient(pkg.HarborAdminUsername, pkg.HarborAdminPassword, url)
+	err = client.DeleteClient(pkg.HarborAdminUsername, pkg.HarborAdminPassword, url)
 	if err != nil {
 		return err
 	}
