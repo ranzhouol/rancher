@@ -800,13 +800,13 @@ func createHarborEdgesphereAdmin() {
 
 	// 创建 harbor 用户
 	if err := harboruser.Create(pkg.HarborAdminUsername, pkg.HarborAdminPassword, username, password, email, username, "1"); err != nil {
-		logrus.Errorf("创建制品库用户%v失败: %v", username, err.Error())
+		logrus.Errorf("创建制品库管理员%v,失败: %v", username, err.Error())
 	}
 
-	// 设置为管理员
-	if err := harboruser.SetAdmin(pkg.HarborAdminUsername, pkg.HarborAdminPassword, username, true); err != nil {
-		logrus.Errorf("设置制品库管理员%v失败: %v", username, err.Error())
-		return
-	}
+	//// 设置为管理员
+	//if err := harboruser.SetAdmin(pkg.HarborAdminUsername, pkg.HarborAdminPassword, username, true); err != nil {
+	//	logrus.Errorf("设置制品库管理员%v失败: %v", username, err.Error())
+	//	return
+	//}
 	logrus.Info("初始化制品库成功")
 }

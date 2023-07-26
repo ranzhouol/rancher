@@ -99,6 +99,14 @@ func Create(authUsername, authPassword, username, password, email, realname, com
 	if err != nil {
 		return err
 	}
+
+	// 判断是否为系统管理员
+	if comment == "1" {
+		err := SetAdmin(authUsername, authPassword, username, true)
+		if err != nil {
+			return errors.New(fmt.Sprintf("设置制品库管理员%v失败: %v", username, err.Error()))
+		}
+	}
 	return nil
 }
 
@@ -177,7 +185,7 @@ func SetAdmin(authUsername, authPassword, username string, isAdmin bool) error {
 	if authUsername == "admin" {
 		authPassword = pkg.HarborAdminPassword
 	}
-	
+
 	// 获取用户id
 	userid, err := GetUserId(authUsername, authPassword, username)
 	if err != nil {
