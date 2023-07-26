@@ -1,6 +1,7 @@
 package user
 
 import (
+	"github.com/rancher/rancher/pkg/k8sproxy/harborproxy/pkg"
 	harboruser "github.com/rancher/rancher/pkg/k8sproxy/harborproxy/pkg/user"
 	"strings"
 	"sync"
@@ -132,6 +133,19 @@ func (s *userStore) Create(apiContext *types.APIContext, schema *types.Schema, d
 		return nil, errors.New("invalid password")
 	}
 
+	// 对应 authorityLeve
+	description, ok := data[client.UserFieldDescription].(string)
+	if !ok {
+		return nil, errors.New("invalid description")
+	}
+
+	// 保存密码
+	encryptPassword, err := pkg.EncryptString(pkg.Key, password)
+	if err != nil {
+		logrus.Errorf("用户%v，密码加密失败：%v", username, err.Error())
+	}
+	data[client.UserFieldEdgespherePW] = encryptPassword
+
 	if err := s.validateDescription(data); err != nil {
 		return nil, err
 	}
@@ -194,15 +208,72 @@ Tries:
 	delete(created, client.UserFieldPassword)
 
 	// 创建 harbor 用户
-	authUsername := apiContext.Request.Header.Get("Impersonate-Extra-Username")
-	logrus.Infof("发送指令用户：%v", authUsername)
-	if err := harboruser.Create(username, password, username+"@qq.com", username); err != nil {
+	// description -> authorityLeve
+	if err := createHarborUser(s, apiContext, username, password, username+"@qq.com", username, description); err != nil {
 		logrus.Errorf("创建harbor用户%v失败: %v", username, err.Error())
 	}
 	//created["annotations"].(map[string]interface{})["edgesphere/harbor-users"] = "true"
 	//logrus.Info("创建4的created: ", created)
 
 	return created, nil
+}
+
+// 获取 harbor user密码
+func getHarborPassword(s *userStore, username string) (string, error) {
+	users, err := s.userIndexer.ByIndex(userByUsernameIndex, username)
+	if err != nil {
+		return "", err
+	}
+	logrus.Infof("users: %v,len: %v", users, len(users))
+	if len(users) != 1 {
+		return "", errors.New("The number of users is not one")
+	}
+	for _, obj := range users {
+		userObj, ok := obj.(*v3.User)
+		if !ok {
+			return "", errors.New("could not convert obj to v3.User")
+		}
+		encryptAuthPassword := userObj.EdgespherePW
+		if len(encryptAuthPassword) == 0 {
+			if username == "admin" {
+				return pkg.HarborAdminPassword, nil
+			}
+			return "", errors.New("EdgespherePW is empty")
+		}
+
+		// 解码
+		authPassword, err := pkg.DecryptString(pkg.Key, encryptAuthPassword)
+		if err != nil {
+			logrus.Errorf("解码失败: %v", err.Error())
+			return "", err
+		}
+		return authPassword, nil
+	}
+	return "", nil
+}
+
+// 创建 harbor user
+func createHarborUser(s *userStore, apiContext *types.APIContext, username, password, email, realname, comment string) error {
+	// 获取当前用户
+	authUsername := apiContext.Request.Header.Get("Impersonate-Extra-Username")
+	if len(authUsername) == 0 {
+		return errors.New("There was an error authorizing the user")
+	}
+	logrus.Infof("发送指令用户：%v", authUsername)
+
+	// 获取密码
+	authPassword, err := getHarborPassword(s, authUsername)
+	if err != nil {
+		logrus.Errorf("获取 EdgespherePW 失败: %v", err.Error())
+		return err
+	}
+
+	// 创建 user
+	if err := harboruser.Create(authUsername, authPassword, username, password, email, realname, comment); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (s *userStore) validateDescription(data map[string]interface{}) error {
@@ -273,15 +344,13 @@ func (s *userStore) Delete(apiContext *types.APIContext, schema *types.Schema, i
 	}
 
 	// 删除harbor用户
-	authUsername := apiContext.Request.Header.Get("Impersonate-Extra-Username")
 	data, err := s.Store.ByID(apiContext, schema, id)
 	if err != nil {
 		logrus.Error(err.Error())
 	}
-	username := data["username"]
-	logrus.Infof("发送指令用户：%v", authUsername)
+	username := data["username"].(string)
 	logrus.Infof("指令删除用户：%v", username)
-	if err := harboruser.Delete(username.(string)); err != nil {
+	if err := deleteHarborUser(s, apiContext, username); err != nil {
 		logrus.Errorf("制品库用户 %v, 删除失败: %v", username, err.Error())
 	}
 
@@ -295,4 +364,28 @@ func getUser(apiContext *types.APIContext) (string, error) {
 	}
 
 	return user, nil
+}
+
+// 删除 harbor user
+func deleteHarborUser(s *userStore, apiContext *types.APIContext, username string) error {
+	// 获取当前用户
+	authUsername := apiContext.Request.Header.Get("Impersonate-Extra-Username")
+	if len(authUsername) == 0 {
+		return errors.New("There was an error authorizing the user")
+	}
+	logrus.Infof("发送指令用户：%v", authUsername)
+
+	// 获取密码
+	authPassword, err := getHarborPassword(s, authUsername)
+	if err != nil {
+		logrus.Errorf("获取 EdgespherePW 失败: %v", err.Error())
+		return err
+	}
+
+	// 刪除 user
+	if err := harboruser.Delete(authUsername, authPassword, username); err != nil {
+		return err
+	}
+
+	return nil
 }

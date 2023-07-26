@@ -1,6 +1,7 @@
 package user
 
 import (
+	"github.com/rancher/rancher/pkg/k8sproxy/harborproxy/pkg"
 	harboruser "github.com/rancher/rancher/pkg/k8sproxy/harborproxy/pkg/user"
 	"github.com/sirupsen/logrus"
 	"net/http"
@@ -111,18 +112,28 @@ func (h *Handler) changePassword(actionName string, action *types.Action, reques
 		return err
 	}
 
+	// 旧密码
+	oldEdgespherePW := user.EdgespherePW
+
 	user.Password = newPassHash
 	user.MustChangePassword = false
+	// 保存新密码
+	encryptPassword, err := pkg.EncryptString(pkg.Key, newPass)
+	if err != nil {
+		logrus.Errorf("用户%v，密码加密失败：%v", user.Username, err.Error())
+	}
+	user.EdgespherePW = encryptPassword
 	user, err = h.UserClient.Update(user)
 	if err != nil {
 		return err
 	}
 
 	// 更新harbor密码
-	authUsername := request.Request.Header.Get("Impersonate-Extra-Username")
+	//authUsername := request.Request.Header.Get("Impersonate-Extra-Username")
+	authUsername := user.Username
 	logrus.Infof("发送指令用户：%v", authUsername)
-	if err = harboruser.ChangePassword(user.Username, newPass); err != nil {
-		logrus.Errorf("制品库用户%v, 更新失败:%v", user.Username, err.Error())
+	if err = changeHarborPassword(authUsername, oldEdgespherePW, newPass); err != nil {
+		logrus.Errorf("制品库用户%v, 更新密码失败:%v", user.Username, err.Error())
 	}
 
 	return nil
@@ -155,6 +166,13 @@ func (h *Handler) setPassword(actionName string, action *types.Action, request *
 		return httperror.NewAPIError(httperror.InvalidBodyContent, err.Error())
 	}
 
+	// 保存新密码
+	encryptPassword, err := pkg.EncryptString(pkg.Key, newPass)
+	if err != nil {
+		logrus.Errorf("用户%v，密码加密失败：%v", username, err.Error())
+	}
+	userData[client.UserFieldEdgespherePW] = encryptPassword
+
 	userData[client.UserFieldPassword] = newPass
 	if err := hashPassword(userData); err != nil {
 		return err
@@ -170,12 +188,97 @@ func (h *Handler) setPassword(actionName string, action *types.Action, request *
 	request.WriteResponse(http.StatusOK, userData)
 
 	// 更新harbor密码
-	authUsername := request.Request.Header.Get("Impersonate-Extra-Username")
-	logrus.Infof("发送指令用户：%v", authUsername)
-	if err = harboruser.ChangePassword(username, newPass); err != nil {
+	if err = setHarborPassword(h, request, username, newPass); err != nil {
 		logrus.Errorf("制品库用户%v, 更新失败:%v", username, err.Error())
 	}
 	return nil
+}
+
+// 修改 harbor 密码，用于 changePassword
+func changeHarborPassword(authUsername, encryptAuthPassword, newPass string) error {
+	// 获取密码
+	authPassword, err := getHarborChangePassword(authUsername, encryptAuthPassword)
+	if err != nil {
+		logrus.Infof("获取密码失败: %v", err.Error())
+		return err
+	}
+
+	// 修改密码
+	if err := harboruser.ChangeCurrentPassword(authUsername, authPassword, newPass); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// 修改 harbor 密码，用于 setPassword
+func setHarborPassword(h *Handler, request *types.APIContext, username, newPass string) error {
+	// 获取当前用户
+	authUsername := request.Request.Header.Get("Impersonate-Extra-Username")
+	if len(authUsername) == 0 {
+		return errors.New("There was an error authorizing the user")
+	}
+	logrus.Infof("发送指令用户：%v", authUsername)
+
+	// 获取密码
+	userID := request.Request.Header.Get("Impersonate-User")
+	if userID == "" {
+		return errors.New("can't find user")
+	}
+
+	authPassword, err := getHarborSetPassword(h, userID)
+	if err != nil {
+		logrus.Infof("获取密码失败: %v", err.Error())
+		return err
+	}
+
+	if authUsername == "admin" && authPassword == "" { // 初次登录
+		authPassword = pkg.HarborAdminPassword
+	}
+
+	// 修改密码
+	if err := harboruser.ChangePassword(authUsername, authPassword, username, newPass); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// 获取 harbor user密码, 用于 changePassword
+func getHarborChangePassword(authUsername, encryptAuthPassword string) (string, error) {
+	if authUsername == "admin" && encryptAuthPassword == "" { // 初次登录
+		return pkg.HarborAdminPassword, nil
+	}
+	// 解码
+	authPassword, err := pkg.DecryptString(pkg.Key, encryptAuthPassword)
+	if err != nil {
+		logrus.Errorf("解码失败: %v", err.Error())
+		return "", err
+	}
+
+	return authPassword, nil
+}
+
+// 获取 harbor user密码, 用于 setPassword
+func getHarborSetPassword(h *Handler, userID string) (string, error) {
+	authUser, err := h.UserClient.Get(userID, v1.GetOptions{})
+	if err != nil {
+		return "", err
+	}
+
+	encryptAuthPassword := authUser.EdgespherePW
+	if len(encryptAuthPassword) == 0 {
+		return "", nil
+	}
+
+	// 解码
+	authPassword, err := pkg.DecryptString(pkg.Key, encryptAuthPassword)
+	if err != nil {
+		logrus.Errorf("解码失败: %v", err.Error())
+		return "", err
+	}
+
+	return authPassword, nil
 }
 
 func (h *Handler) refreshAttributes(actionName string, action *types.Action, request *types.APIContext) error {

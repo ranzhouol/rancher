@@ -3,7 +3,6 @@ package harboruser
 import (
 	"context"
 	apis "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	harboruser "github.com/rancher/rancher/pkg/k8sproxy/harborproxy/pkg/user"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -60,9 +59,9 @@ func (h HarborUserHandler) sync(key string, obj *apis.User) (runtime.Object, err
 
 func (h HarborUserHandler) Create(username, password, email, realname string) error {
 	logrus.Infof("username:%s,password:%s,email:%s,displayname:%s", username, password, email, realname)
-	err := harboruser.Create(username, password, email, realname)
-	if err != nil {
-		return err
-	}
+	//err := harboruser.Create(username, password, email, realname)
+	//if err != nil {
+	//	return err
+	//}
 	return nil
 }

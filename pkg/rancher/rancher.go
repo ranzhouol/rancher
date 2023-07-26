@@ -795,17 +795,16 @@ func createKarmadaToken(client kubernetes.Interface) {
 func createHarborEdgesphereAdmin() {
 	logrus.Info("初始化制品库")
 	username := pkg.HarborEdgesphereAdmin
-	//password := pkg.HarborAdminPassword
-	password := "Harbor12345"
+	password := pkg.HarborAdminPassword
 	email := username + "@email.com"
 
 	// 创建 harbor 用户
-	if err := harboruser.Create(username, password, email, username); err != nil {
+	if err := harboruser.Create(pkg.HarborAdminUsername, pkg.HarborAdminPassword, username, password, email, username, "1"); err != nil {
 		logrus.Errorf("创建制品库用户%v失败: %v", username, err.Error())
 	}
 
 	// 设置为管理员
-	if err := harboruser.SetAdmin(username, true); err != nil {
+	if err := harboruser.SetAdmin(pkg.HarborAdminUsername, pkg.HarborAdminPassword, username, true); err != nil {
 		logrus.Errorf("设置制品库管理员%v失败: %v", username, err.Error())
 		return
 	}

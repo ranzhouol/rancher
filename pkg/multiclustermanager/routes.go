@@ -62,7 +62,7 @@ func router(ctx context.Context, localClusterEnabled bool, tunnelAuthorizer *mcm
 		connectConfigHandler = rkenodeconfigserver.Handler(tunnelAuthorizer, scaledContext)
 		clusterImport        = clusterregistrationtokens.ClusterImport{Clusters: scaledContext.Management.Clusters("")}
 		karmadaProxy         = karmadaproxy2.NewKarmadaJoinProxy(scaledContext)
-		harborProxy          = harborproxy.NewHarborProxy()
+		harborProxy          = harborproxy.NewHarborProxy(scaledContext)
 	)
 	managerContext = scaledContext
 	tokenAPI, err := tokens.NewAPIHandler(ctx, scaledContext, norman.ConfigureAPIUI)
