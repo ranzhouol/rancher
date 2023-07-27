@@ -16,12 +16,17 @@ type Controller struct {
 	workload *config.UserContext
 }
 
+var (
+	// 需要放置到 System 项目下的命名空间
+	SystemNamespaces = []string{"prometheus", "karmada-system"}
+)
+
 func Register(ctx context.Context, workload *config.UserContext) {
 	c := &Controller{
 		ctx:      ctx,
 		workload: workload,
 	}
-	c.workload.Core.Namespaces("").AddHandler(ctx, "NamespaceAddAnnotationSyncHandler", c.sync)
+	c.workload.Core.Namespaces("").AddHandler(ctx, "namespaceEdgesphereSyncHandler", c.sync)
 }
 
 func (c *Controller) sync(key string, obj *v1.Namespace) (runtime.Object, error) {
@@ -57,6 +62,14 @@ func (c *Controller) AddClusterName(namespacewatch watch.Interface, clusterName 
 				annotation["clusterName"] = clusterName
 				c.workload.Management.Core.Namespaces("").Update(namespace)
 			}
+		}
+	}
+}
+
+func (c *Controller) AddToSystem(obj *v1.Namespace, clusterName string) {
+	for _, sns := range SystemNamespaces {
+		if obj.ObjectMeta.Name == sns {
+
 		}
 	}
 }
