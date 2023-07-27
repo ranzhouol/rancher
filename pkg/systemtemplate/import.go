@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"io"
+	"os"
 	"sort"
 	"strings"
 	"text/template"
@@ -44,6 +45,8 @@ type context struct {
 	PrivateRegistryConfig string
 	Tolerations           string
 	ClusterRegistry       string
+	HostName              string
+	HostIP                string
 }
 
 var (
@@ -109,6 +112,16 @@ func SystemTemplate(resp io.Writer, agentImage, authImage, namespace, token, url
 
 	agentEnvVars = templates.ToYAML(envVars)
 
+	// 添加域名解析
+	hostName := os.Getenv("ServerURL")
+	if hostName == "" {
+		logrus.Error("找不到环境变量 ServerURL")
+	}
+	hostIp := os.Getenv("HostIP")
+	if hostIp == "" {
+		logrus.Error("找不到环境变量 HostIP")
+	}
+
 	context := &context{
 		Features:              toFeatureString(features),
 		CAChecksum:            CAChecksum(),
@@ -125,6 +138,8 @@ func SystemTemplate(resp io.Writer, agentImage, authImage, namespace, token, url
 		PrivateRegistryConfig: privateRegistryConfig,
 		Tolerations:           tolerations,
 		ClusterRegistry:       clusterRegistry,
+		HostName:              hostName,
+		HostIP:                hostIp,
 	}
 
 	return t.Execute(resp, context)
