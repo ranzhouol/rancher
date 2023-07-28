@@ -26,7 +26,7 @@ func GetAllUser(authUsername, authPassword string) ([]User, error) {
 		authPassword = pkg.HarborAdminPassword
 	}
 
-	url := "/api/v2.0/users"
+	url := "/api/v2.0/users?page=1&page_size=-1"
 	body, err := client.GetClient(authUsername, authPassword, url)
 	if err != nil {
 		return nil, err
@@ -79,7 +79,7 @@ func GetUserId(authUsername, authPassword, username string) (int, error) {
 		}
 	}
 	notFind := fmt.Sprintf("制品库不存在该用户:%v", username)
-	return -1, errors.New(notFind)
+	return 0, errors.New(notFind)
 }
 
 func Create(authUsername, authPassword, username, password, email, realname, comment string) error {

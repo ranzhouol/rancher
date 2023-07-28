@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/rancher/rancher/pkg/k8sproxy/harborproxy/pkg"
+	harboruser "github.com/rancher/rancher/pkg/k8sproxy/harborproxy/pkg/user"
 	"reflect"
 	"strings"
 	"time"
@@ -117,7 +119,51 @@ func (l *projectLifecycle) sync(key string, orig *v3.Project) (runtime.Object, e
 		return nil, err
 	}
 
+	// 创建项目对应的harbor user
+	if err := createProjectHarborOwner(orig); err != nil {
+		logrus.Errorf("为项目%v创建制品库项目owner失败: %v", orig.Spec.DisplayName, err.Error())
+	}
+
 	return nil, nil
+}
+
+// 确认项目对应的harbor user是否存在
+func ensureProjectHarborOwner(projectOwnerName string) (bool, error) {
+	isExist := false
+	userid, err := harboruser.GetUserId(pkg.HarborAdminUsername, pkg.HarborAdminPassword, projectOwnerName)
+	if err != nil {
+		if userid == 0 { //用户不存在
+			return isExist, nil
+		}
+		return isExist, err
+	}
+	isExist = true
+
+	return isExist, nil
+}
+
+// 创建项目对应的harbor user
+func createProjectHarborOwner(orig *v3.Project) error {
+	logrus.Info("project name: ", orig.Spec.DisplayName)
+	projectOwnerName := orig.Spec.DisplayName + pkg.ProjectOwnerSuffix
+
+	// 检查用户是否存在
+	isExist, err := ensureProjectHarborOwner(projectOwnerName)
+	if err != nil {
+		return err
+	}
+
+	if !isExist {
+		projectOwnerPassword := pkg.MD5String(projectOwnerName)
+		email := projectOwnerName + "@email.com"
+		if err := harboruser.Create(pkg.HarborAdminUsername, pkg.HarborAdminPassword, projectOwnerName, projectOwnerPassword, email, projectOwnerName, "2"); err != nil {
+			return err
+		}
+		logrus.Infof("为项目%v创建制品库项目owner成功", orig.Spec.DisplayName)
+		return nil
+	}
+
+	return nil
 }
 
 func (l *projectLifecycle) enqueueCrtbs(project *v3.Project) error {

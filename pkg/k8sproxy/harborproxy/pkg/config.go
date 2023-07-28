@@ -3,6 +3,7 @@ package pkg
 import (
 	"crypto/aes"
 	"crypto/cipher"
+	"crypto/md5"
 	"crypto/rand"
 	"encoding/base64"
 	"fmt"
@@ -15,11 +16,14 @@ const (
 
 	// harbor admin
 	HarborAdminUsername   = "admin"
-	HarborEdgesphereAdmin = "admin-edgesphere-harbor"
+	HarborEdgesphereAdmin = "admin-edgesphere"
 	HarborAdminPassword   = "Harbor12345"
 
 	// 密钥
 	Key = "szsciit-Edgesphere-123$%" // 24 字节的密钥
+
+	// project 用户名后缀
+	ProjectOwnerSuffix = "-owner"
 )
 
 // 加密
@@ -85,4 +89,13 @@ func DecryptString(key, encStr string) (string, error) {
 	}
 
 	return string(plaintext), nil
+}
+
+// MD5加密 16位, 并且末尾添加 1aA
+func MD5String(str string) string {
+	h := md5.New()
+	h.Write([]byte(str))
+	md5Str := fmt.Sprintf("%x", h.Sum(nil))
+	password := md5Str[8:24] + "1aA"
+	return password
 }
