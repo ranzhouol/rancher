@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/rancher/rancher/pkg/k8sproxy/harborproxy/pkg"
+	harborproject "github.com/rancher/rancher/pkg/k8sproxy/harborproxy/pkg/project"
 	harboruser "github.com/rancher/rancher/pkg/k8sproxy/harborproxy/pkg/user"
 	"reflect"
 	"strings"
@@ -120,35 +121,30 @@ func (l *projectLifecycle) sync(key string, orig *v3.Project) (runtime.Object, e
 	}
 
 	// 创建项目对应的harbor user
-	if err := createProjectHarborOwner(orig); err != nil {
-		logrus.Errorf("为项目%v创建制品库项目owner失败: %v", orig.Spec.DisplayName, err.Error())
+	if orig.GetAnnotations()[pkg.ProjectOwnerAnnotation] != "true" {
+		if err := createProjectHarborOwner(l, orig); err != nil {
+			logrus.Errorf("为项目%v创建制品库owner失败: %v", orig.Spec.DisplayName, err.Error())
+		}
+	}
+
+	// 创建项目对应的 project-helmchart
+	if orig.GetAnnotations()[pkg.ProjectHelmChartAnnotation] != "true" {
+		if err := createProjectHelmChart(l, orig); err != nil {
+			logrus.Errorf("为项目%v创建应用市场失败: %v", orig.Spec.DisplayName, err.Error())
+		}
 	}
 
 	return nil, nil
 }
 
-// 确认项目对应的harbor user是否存在
-func ensureProjectHarborOwner(projectOwnerName string) (bool, error) {
-	isExist := false
-	userid, err := harboruser.GetUserId(pkg.HarborAdminUsername, pkg.HarborAdminPassword, projectOwnerName)
-	if err != nil {
-		if userid == 0 { //用户不存在
-			return isExist, nil
-		}
-		return isExist, err
-	}
-	isExist = true
-
-	return isExist, nil
-}
-
 // 创建项目对应的harbor user
-func createProjectHarborOwner(orig *v3.Project) error {
-	logrus.Info("project name: ", orig.Spec.DisplayName)
-	projectOwnerName := orig.Spec.DisplayName + pkg.ProjectOwnerSuffix
+func createProjectHarborOwner(l *projectLifecycle, orig *v3.Project) error {
+	projectName := orig.Spec.DisplayName
+	logrus.Info("project name: ", projectName)
+	projectOwnerName := projectName + pkg.ProjectOwnerSuffix
 
 	// 检查用户是否存在
-	isExist, err := ensureProjectHarborOwner(projectOwnerName)
+	isExist, err := harboruser.EnsureUserIfExist(projectOwnerName)
 	if err != nil {
 		return err
 	}
@@ -159,9 +155,77 @@ func createProjectHarborOwner(orig *v3.Project) error {
 		if err := harboruser.Create(pkg.HarborAdminUsername, pkg.HarborAdminPassword, projectOwnerName, projectOwnerPassword, email, projectOwnerName, "2"); err != nil {
 			return err
 		}
-		logrus.Infof("为项目%v创建制品库项目owner成功", orig.Spec.DisplayName)
+
+		annotation := orig.GetAnnotations()
+		if annotation == nil {
+			annotation = map[string]string{}
+			orig.SetAnnotations(annotation)
+		}
+		orig.Annotations[pkg.ProjectOwnerAnnotation] = "true"
+		_, err = l.mgr.mgmt.Management.Projects("").ObjectClient().Update(orig.Name, orig)
+		if err != nil {
+			logrus.Info(err.Error())
+		}
+
+		logrus.Infof("为项目%v创建制品库owner成功", projectName)
 		return nil
 	}
+
+	annotation := orig.GetAnnotations()
+	if annotation == nil {
+		annotation = map[string]string{}
+		orig.SetAnnotations(annotation)
+	}
+	orig.Annotations[pkg.ProjectOwnerAnnotation] = "true"
+	_, err = l.mgr.mgmt.Management.Projects("").ObjectClient().Update(orig.Name, orig)
+	if err != nil {
+		logrus.Info(err.Error())
+	}
+
+	return nil
+}
+
+// 创建 project-helmchart
+func createProjectHelmChart(l *projectLifecycle, orig *v3.Project) error {
+	projectName := orig.Spec.DisplayName
+	projectOwnerName := projectName + pkg.ProjectOwnerSuffix
+	projectName = strings.ToLower(projectName)
+	projectOwnerPassword := pkg.MD5String(projectOwnerName)
+	projectHelmChartName := projectName + pkg.ProjectHelmChartSuffix
+
+	// 检查是否存在
+	if _, err := harborproject.GetProject(projectOwnerName, projectOwnerPassword, projectHelmChartName); err == nil { // 已存在
+		annotation := orig.GetAnnotations()
+		if annotation == nil {
+			annotation = map[string]string{}
+			orig.SetAnnotations(annotation)
+		}
+		orig.Annotations[pkg.ProjectHelmChartAnnotation] = "true"
+		_, err = l.mgr.mgmt.Management.Projects("").ObjectClient().Update(orig.Name, orig)
+		if err != nil {
+			logrus.Info(err.Error())
+		}
+
+		return nil
+	}
+
+	// 创建 project-helmchart
+	if err := harborproject.Create(projectOwnerName, projectOwnerPassword, projectHelmChartName, "false", 0); err != nil {
+		return err
+	}
+
+	annotation := orig.GetAnnotations()
+	if annotation == nil {
+		annotation = map[string]string{}
+		orig.SetAnnotations(annotation)
+	}
+	orig.Annotations[pkg.ProjectHelmChartAnnotation] = "true"
+	_, err := l.mgr.mgmt.Management.Projects("").ObjectClient().Update(orig.Name, orig)
+	if err != nil {
+		logrus.Info(err.Error())
+	}
+
+	logrus.Errorf("为项目%v创建应用市场成功", projectName)
 
 	return nil
 }

@@ -204,3 +204,18 @@ func SetAdmin(authUsername, authPassword, username string, isAdmin bool) error {
 
 	return nil
 }
+
+// 确认项目对应的harbor user是否存在
+func EnsureUserIfExist(username string) (bool, error) {
+	isExist := false
+	userid, err := GetUserId(pkg.HarborAdminUsername, pkg.HarborAdminPassword, username)
+	if err != nil {
+		if userid == 0 { //用户不存在
+			return isExist, nil
+		}
+		return isExist, err
+	}
+	isExist = true
+
+	return isExist, nil
+}
