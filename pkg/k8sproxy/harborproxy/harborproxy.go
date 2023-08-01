@@ -190,8 +190,6 @@ func syncProjectUserToHarbor(p *proxyContext, resp *http.Response) error {
 	}
 
 	for _, prtb := range prtblist.Items {
-		logrus.Info("prtb.Name名字: ", prtb.Name)
-		logrus.Info("prtb.Namespace名字: ", prtb.Namespace)
 		if prtb.Name == "creator-project-owner" {
 			logrus.Info("creator-project-owner名字: ", prtb.Name)
 			continue
@@ -209,8 +207,9 @@ func syncProjectUserToHarbor(p *proxyContext, resp *http.Response) error {
 		username := user.Username
 		// user.Description 对应于 authorityLeve
 		displayInt64, _ := strconv.ParseInt(user.Description, 10, 64)
-		logrus.Info("user.Description:", user.Description)
 		roleId := harborproject.AuthorityLeveToRoleId[displayInt64]
+		logrus.Info("projectName:", projectName)
+		logrus.Info("username:", username)
 		logrus.Info("roleID:", roleId)
 		if err := harborproject.CreateProjectMember(p.UserInfo.authUsername, p.UserInfo.authPassword, projectName, username, roleId); err != nil {
 			logrus.Errorf("创建制品库成员%v失败:%v", username, err.Error())
