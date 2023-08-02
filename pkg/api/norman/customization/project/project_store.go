@@ -3,6 +3,12 @@ package project
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/pkg/errors"
+	"github.com/rancher/rancher/pkg/k8sproxy/harborproxy/pkg"
+	harborproject "github.com/rancher/rancher/pkg/k8sproxy/harborproxy/pkg/project"
+	"github.com/sirupsen/logrus"
+	"net/http"
+	"regexp"
 	"strings"
 
 	"github.com/mitchellh/mapstructure"
@@ -46,6 +52,15 @@ func SetProjectStore(schema *types.Schema, mgmt *config.ScaledContext) {
 }
 
 func (s *projectStore) Create(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}) (map[string]interface{}, error) {
+	// 验证项目名称
+	projectName := data["name"].(string)
+	clusterId := data["clusterId"].(string)
+	logrus.Info("项目名:", projectName)
+	logrus.Info("集群id:", clusterId)
+	if err := validateProjectName(s, projectName); err != nil {
+		return nil, httperror.NewAPIError(httperror.InvalidBodyContent, err.Error())
+	}
+
 	annotation, err := s.createProjectAnnotation()
 	if err != nil {
 		return nil, err
@@ -58,6 +73,41 @@ func (s *projectStore) Create(apiContext *types.APIContext, schema *types.Schema
 	values.PutValue(data, annotation, "annotations", roleTemplatesRequired)
 
 	return s.Store.Create(apiContext, schema, data)
+}
+
+// 验证project name
+func validateProjectName(s *projectStore, projectName string) error {
+	minLen := 1
+	maxLen := 60
+
+	//if projectName == project.Default || projectName == project.System { // 加上后前端可以创建Default
+	//	return nil
+	//}
+
+	if len(projectName) < minLen || len(projectName) > maxLen {
+		return errors.Errorf("项目名称的长度不能超过%v", maxLen)
+	}
+
+	validProjectName := regexp.MustCompile(`^[a-z0-9]+(?:[._-][a-z0-9]+)*$`)
+	if !validProjectName.MatchString(projectName) {
+		return errors.New("项目名称由小写字符、数字和 ._- 组成，且不能连续使用 ._- 中2个或2个以上字符，并以小写字母或者数字开头与结尾")
+	}
+
+	// 验证projectName是否存在
+	//proj, err := s.projectLister.Get(clusterId, projectName)
+	projList, err := s.projectLister.List("", labels.Everything())
+	if err != nil {
+		logrus.Errorf("s.projectLister.List('', labels.Everything()) error:%v", err.Error())
+	}
+	for _, proj := range projList {
+		projName := proj.Spec.DisplayName
+		logrus.Info("项目名:", projName)
+		if projName == projectName {
+			return errors.Errorf("项目名称已存在")
+		}
+	}
+
+	return nil
 }
 
 func (s *projectStore) Update(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, id string) (map[string]interface{}, error) {
@@ -75,10 +125,50 @@ func (s *projectStore) Delete(apiContext *types.APIContext, schema *types.Schema
 	if err != nil {
 		return nil, err
 	}
+
+	// 验证项目中的制品库是否存在镜像或者helm chart
+	projectHarborOwner := proj.Spec.DisplayName + pkg.ProjectOwnerSuffix
+	logrus.Info("项目owner名:", projectHarborOwner)
+	ifExist, err := verifyProjectExistHarborResource(pkg.HarborAdminUsername, pkg.HarborAdminPassword, projectHarborOwner)
+	if err != nil {
+		logrus.Errorf("检查项目%v是否存在制品库资源失败:%v", proj.Spec.DisplayName, err.Error())
+	}
+
+	if ifExist {
+		//return nil, errors.ErrPreconditionViolated
+		return nil, httperror.NewAPIErrorLong(http.StatusPreconditionFailed, "PRECONDITION", "项目下的制品库存在镜像或Helm Chart资源，无法删除项目")
+	}
+
 	if proj.Labels["authz.management.cattle.io/system-project"] == "true" {
 		return nil, httperror.NewAPIError(httperror.MethodNotAllowed, "System Project cannot be deleted")
 	}
 	return s.Store.Delete(apiContext, schema, id)
+}
+
+// 验证项目中的制品库是否存在镜像或者helm chart
+func verifyProjectExistHarborResource(authUsername, authPassword, username string) (bool, error) {
+	// 获取该用户创建的所有harbor项目
+	harborProjects, err := harborproject.GetAllPeojectCreatedByUser(authUsername, authPassword, username)
+	if err != nil {
+		logrus.Errorf("获取项目下的所有制品库失败:%v", err.Error())
+		return false, nil
+	}
+
+	// 检查每个项目的可删除状态
+	for _, p := range harborProjects {
+		logrus.Info("owner创建的项目:", p.Name)
+		deleteable, err := harborproject.GetProjectDeletable(authUsername, authPassword, p.Name)
+		if err != nil {
+			logrus.Errorf("查看制品库%v可删除状态失败:%v", p.Name, err.Error())
+			return false, nil
+		}
+
+		if !deleteable {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }
 
 func (s *projectStore) createProjectAnnotation() (string, error) {

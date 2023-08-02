@@ -137,7 +137,7 @@ func (l *projectLifecycle) sync(key string, orig *v3.Project) (runtime.Object, e
 	return nil, nil
 }
 
-// 创建项目对应的harbor user
+// 创建项目对应的harbor owner user
 func createProjectHarborOwner(l *projectLifecycle, orig *v3.Project) error {
 	projectName := orig.Spec.DisplayName
 	logrus.Info("project name: ", projectName)
@@ -194,7 +194,7 @@ func createProjectHelmChart(l *projectLifecycle, orig *v3.Project) error {
 	projectHelmChartName := projectName + pkg.ProjectHelmChartSuffix
 
 	// 检查是否存在
-	if _, err := harborproject.GetProject(projectOwnerName, projectOwnerPassword, projectHelmChartName); err == nil { // 已存在
+	if _, err := harborproject.GetProject(pkg.HarborAdminUsername, pkg.HarborAdminPassword, projectHelmChartName); err == nil { // 已存在
 		annotation := orig.GetAnnotations()
 		if annotation == nil {
 			annotation = map[string]string{}
@@ -226,6 +226,66 @@ func createProjectHelmChart(l *projectLifecycle, orig *v3.Project) error {
 	}
 
 	logrus.Errorf("为项目%v创建应用市场成功", projectName)
+
+	return nil
+}
+
+// 删除项目对应的harbor资源
+func deleteProjectHarborResource(authUsername, authPassword, projectName string) error {
+	// 删除项目 harbor owner user创建的harbor项目
+	projectOwnerName := projectName + pkg.ProjectOwnerSuffix
+	if err := deleteAllHarborProjectCreatedByUser(authUsername, authPassword, projectOwnerName); err != nil {
+		logrus.Errorf("删除项目下的所有制品库失败: %v", err.Error())
+		return err
+	}
+
+	// 删除项目对应的harbor owner user
+	if err := deleteProjectHarborOwner(authUsername, authPassword, projectOwnerName); err != nil {
+		logrus.Errorf("删除项目的制品库owner失败: %v", err.Error())
+		return err
+	}
+
+	return nil
+}
+
+// 删除项目对应的harbor owner user
+func deleteProjectHarborOwner(authUsername, authPassword, username string) error {
+	// 检查用户是否存在
+	isExist, err := harboruser.EnsureUserIfExist(username)
+	if err != nil {
+		return err
+	}
+
+	if isExist { //存在
+		if err := harboruser.Delete(authUsername, authPassword, username); err != nil {
+			return err
+		}
+		logrus.Infof("删除项目的制品库owner成功")
+		return nil
+	}
+
+	return nil
+}
+
+// 删除项目harbor owner user创建的harbor项目
+func deleteAllHarborProjectCreatedByUser(authUsername, authPassword, username string) error {
+	// 获取该用户创建的所有harbor项目
+	harborProjects, err := harborproject.GetAllPeojectCreatedByUser(authUsername, authPassword, username)
+	if err != nil {
+		return err
+	}
+
+	// 删除所有项目
+	if len(harborProjects) > 0 {
+		for _, p := range harborProjects {
+			logrus.Info("owner创建的项目:", p.Name)
+			err := harborproject.Delete(authUsername, authPassword, p.Name)
+			if err != nil {
+				return err
+			}
+		}
+		logrus.Info("删除项目下的所有制品库成功")
+	}
 
 	return nil
 }
@@ -270,6 +330,13 @@ func (l *projectLifecycle) Remove(obj *v3.Project) (runtime.Object, error) {
 	err = l.mgr.deleteNamespace(obj, projectRemoveController)
 	if err != nil {
 		returnErr = multierror.Append(returnErr, err)
+	}
+
+	// 删除项目中对应的制品库资源
+	projectName := obj.Spec.DisplayName
+	logrus.Infof("删除项目:", projectName)
+	if err := deleteProjectHarborResource(pkg.HarborAdminUsername, pkg.HarborAdminPassword, projectName); err != nil {
+		logrus.Infof("为项目%v删除制品库资源失败: %v", projectName, err.Error())
 	}
 	return obj, returnErr
 }

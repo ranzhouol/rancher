@@ -15,6 +15,7 @@ var AuthorityLeveToRoleId = map[int64]int{
 	3: 2,
 }
 
+// 创建项目时使用
 type Project struct {
 	ProjectName  string    `json:"project_name"`
 	MetaData     *metadata `json:"metadata"`
@@ -29,6 +30,16 @@ type metadata struct {
 	Public string `json:"public"`
 }
 
+// 响应的项目结构体
+type ResponseProject struct {
+	Name       string `json:"name"`
+	ProjectId  int32  `json:"project_id"`
+	OwnerName  string `json:"owner_name"`
+	OwnerId    int32  `json:"owner_id"`
+	RepoCount  int    `json:"repo_count"`
+	ChartCount int    `json:"chart_count"`
+}
+
 // 项目成员
 type ProjectMember struct {
 	RoleId     int         `json:"role_id"`
@@ -39,7 +50,13 @@ type memberUser struct {
 	Username string `json:"username"`
 }
 
-func GetProject(authUsername, authPassword, projectNameOrid string) (*Project, error) {
+// 项目可删除状态
+type ProjectDeletable struct {
+	Message   string `json:"message"`
+	Deletable bool   `json:"deletable"`
+}
+
+func GetProject(authUsername, authPassword, projectNameOrid string) (*ResponseProject, error) {
 	if authUsername == "admin" {
 		authPassword = pkg.HarborAdminPassword
 	}
@@ -50,13 +67,13 @@ func GetProject(authUsername, authPassword, projectNameOrid string) (*Project, e
 		return nil, err
 	}
 
-	var p Project
+	var p *ResponseProject
 	if err := json.Unmarshal(body, &p); err != nil {
 		logrus.Error("解析JSON失败: ", err.Error())
 		return nil, err
 	}
 
-	return &p, nil
+	return p, nil
 }
 
 func Create(authUsername, authPassword, projectName, public string, storageLimit int64) error {
@@ -64,7 +81,7 @@ func Create(authUsername, authPassword, projectName, public string, storageLimit
 		authPassword = pkg.HarborAdminPassword
 	}
 
-	projectName = strings.ToLower(projectName)
+	projectName = strings.ToLower(projectName) // 用于Default和System项目
 	m := &metadata{
 		Public: public,
 	}
@@ -101,6 +118,66 @@ func CreateProjectMember(authUsername, authPassword, projectName, username strin
 
 	url := fmt.Sprintf("/api/v2.0/projects/%v/members", projectName)
 	err := client.PostClient(authUsername, authPassword, url, projectMember)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// 查看项目的可删除状态
+func GetProjectDeletable(authUsername, authPassword, projectNameOrId string) (bool, error) {
+	if authUsername == "admin" {
+		authPassword = pkg.HarborAdminPassword
+	}
+
+	url := fmt.Sprintf("/api/v2.0/projects/%v/_deletable", projectNameOrId)
+	body, err := client.GetClient(authUsername, authPassword, url)
+	if err != nil {
+		return false, err
+	}
+
+	var projectDeletable *ProjectDeletable
+	if err := json.Unmarshal(body, &projectDeletable); err != nil {
+		logrus.Error("解析JSON失败: ", err.Error())
+		return false, err
+	}
+
+	if projectDeletable.Deletable == true {
+		return true, nil
+	}
+
+	return false, nil
+}
+
+// 获取用户创建的所有项目
+func GetAllPeojectCreatedByUser(authUsername, authPassword, username string) ([]*ResponseProject, error) {
+	if authUsername == "admin" {
+		authPassword = pkg.HarborAdminPassword
+	}
+
+	url := fmt.Sprintf("/api/v2.0/projects?owner=%v&page=1&page_size=-1", username)
+	body, err := client.GetClient(authUsername, authPassword, url)
+	if err != nil {
+		return nil, err
+	}
+
+	var projects []*ResponseProject
+	if err := json.Unmarshal(body, &projects); err != nil {
+		logrus.Error("解析JSON失败: ", err.Error())
+		return nil, err
+	}
+
+	return projects, nil
+}
+
+func Delete(authUsername, authPassword, projectNameOrId string) error {
+	if authUsername == "admin" {
+		authPassword = pkg.HarborAdminPassword
+	}
+
+	url := fmt.Sprintf("/api/v2.0/projects/%v", projectNameOrId)
+	err := client.DeleteClient(authUsername, authPassword, url)
 	if err != nil {
 		return err
 	}
