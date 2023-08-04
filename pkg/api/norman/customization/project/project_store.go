@@ -89,8 +89,9 @@ func validateProjectName(s *projectStore, projectName string) error {
 	}
 
 	validProjectName := regexp.MustCompile(`^[a-z0-9]+(?:[._-][a-z0-9]+)*$`)
-	if !validProjectName.MatchString(projectName) {
-		return errors.New("项目名称由小写字符、数字和 ._- 组成，且不能连续使用 ._- 中2个或2个以上字符，并以小写字母或者数字开头与结尾")
+	onlyHasLower := regexp.MustCompile("^[0-9]*$")
+	if !validProjectName.MatchString(projectName) || onlyHasLower.MatchString(projectName) {
+		return errors.New("项目名称由小写字符、数字和 ._- 组成，且不能连续使用 ._- 中2个或2个以上字符，并以小写字母或者数字开头与结尾，不允许只包含数字")
 	}
 
 	// 验证projectName是否存在
