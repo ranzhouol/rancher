@@ -247,7 +247,7 @@ func setHarborPassword(h *Handler, request *types.APIContext, username, newPass 
 // 获取 harbor user密码, 用于 changePassword
 func getHarborChangePassword(authUsername, encryptAuthPassword string) (string, error) {
 	if authUsername == "admin" && encryptAuthPassword == "" { // 初次登录
-		return pkg.HarborAdminPassword, nil
+		return pkg.HarborEdgesphereAdminPassword, nil
 	}
 	// 解码
 	authPassword, err := pkg.DecryptString(pkg.Key, encryptAuthPassword)

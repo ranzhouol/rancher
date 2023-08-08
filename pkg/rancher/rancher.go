@@ -795,7 +795,7 @@ func createKarmadaToken(client kubernetes.Interface) {
 func createHarborEdgesphereAdmin() {
 	logrus.Info("初始化制品库")
 	username := pkg.HarborEdgesphereAdmin
-	password := pkg.HarborAdminPassword
+	password := pkg.HarborEdgesphereAdminPassword
 	email := username + "@email.com"
 
 	// 检查用户是否存在

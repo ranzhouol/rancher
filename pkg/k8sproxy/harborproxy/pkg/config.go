@@ -16,9 +16,10 @@ const (
 	//HarborHost = "https://harbor-core.harbor.svc.cluster.local:443"
 
 	// harbor admin
-	HarborAdminUsername   = "admin"
-	HarborEdgesphereAdmin = "admin-edgesphere"
+	HarborAdminUsername = "admin"
 	//HarborAdminPassword   = "Harbor12345"
+	HarborEdgesphereAdmin         = "admin-edgesphere"
+	HarborEdgesphereAdminPassword = "Harbor12345"
 
 	// 密钥
 	Key = "szsciit-Edgesphere-123$%" // 24 字节的密钥
