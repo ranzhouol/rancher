@@ -225,7 +225,7 @@ func createProjectHelmChart(l *projectLifecycle, orig *v3.Project) error {
 		logrus.Info(err.Error())
 	}
 
-	logrus.Errorf("为项目%v创建应用市场成功", projectName)
+	logrus.Infof("为项目%v创建应用市场成功", projectName)
 
 	return nil
 }

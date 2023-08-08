@@ -8,6 +8,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
+	"os"
 )
 
 const (
@@ -17,7 +18,7 @@ const (
 	// harbor admin
 	HarborAdminUsername   = "admin"
 	HarborEdgesphereAdmin = "admin-edgesphere"
-	HarborAdminPassword   = "Harbor12345"
+	//HarborAdminPassword   = "Harbor12345"
 
 	// 密钥
 	Key = "szsciit-Edgesphere-123$%" // 24 字节的密钥
@@ -30,6 +31,27 @@ const (
 	ProjectHelmChartSuffix     = "-helmchart"
 	ProjectHelmChartAnnotation = "edgesphere-registry-helmchart"
 )
+
+var (
+	HarborAdminPassword, HarborNamespace = GetHarborInfo()
+
+	//HarborHost = fmt.Sprintf("https://harbor-core.%v.svc.cluster.local:443", HarborNamespace)
+)
+
+// 获取 harbor admin密码和命名空间
+func GetHarborInfo() (string, string) {
+	adminPassword := os.Getenv("HARBOR_PASSWORD")
+	if adminPassword == "" {
+		adminPassword = "Harbor12345"
+	}
+
+	harborNamespace := os.Getenv("HARBOR_NAMESPACE")
+	if harborNamespace == "" {
+		harborNamespace = "harbor"
+	}
+
+	return adminPassword, harborNamespace
+}
 
 // 加密
 func EncryptString(key, str string) (string, error) {
