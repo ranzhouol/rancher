@@ -15,7 +15,6 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
-	"strconv"
 	"strings"
 )
 
@@ -206,12 +205,21 @@ func syncProjectUserToHarbor(p *proxyContext, resp *http.Response) error {
 		projectName := p.Project.ProjectName
 		username := user.Username
 		// user.Description 对应于 authorityLeve
-		displayInt64, _ := strconv.ParseInt(user.Description, 10, 64)
-		roleId := harborproject.AuthorityLeveToRoleId[displayInt64]
+		//displayInt64, _ := strconv.ParseInt(user.Description, 10, 64)
+		//roleId := harborproject.AuthorityLeveToRoleId[displayInt64]
+		roleId := harborproject.RoleTemplateNameToRoleId[prtb.RoleTemplateName]
 		logrus.Info("projectName:", projectName)
 		logrus.Info("username:", username)
 		logrus.Info("roleID:", roleId)
 		if err := harborproject.CreateProjectMember(p.UserInfo.authUsername, p.UserInfo.authPassword, projectName, username, roleId); err != nil {
+			if strings.Contains(err.Error(), "The project member specified already exist") {
+				if roleId == 1 {
+					if err := harborproject.UpdateProjectMember(p.UserInfo.authUsername, p.UserInfo.authPassword, projectName, username, roleId); err != nil {
+						logrus.Errorf("更新制品库成员%v失败:%v", username, err.Error())
+					}
+				}
+				continue
+			}
 			logrus.Errorf("创建制品库成员%v失败:%v", username, err.Error())
 			return err
 		}
