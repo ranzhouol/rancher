@@ -25,7 +25,7 @@ const (
 	Key = "szsciit-Edgesphere-123$%" // 24 字节的密钥
 
 	// project 用户名后缀
-	ProjectOwnerSuffix     = "-owner"
+	ProjectOwnerSuffix     = "_owner"
 	ProjectOwnerAnnotation = "edgesphere-registry-owner"
 
 	// project-helmchart 项目后缀
