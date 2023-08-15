@@ -10,6 +10,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"io/ioutil"
 	"net/http"
+	"strings"
 )
 
 func RequestSetHeader(username, password string, req *http.Request) {
@@ -20,6 +21,11 @@ func RequestSetHeader(username, password string, req *http.Request) {
 	req.Header.Set("Access-Control-Allow-Origin", "*")
 	req.Header.Set("Access-Control-Allow-Methods", "POST, GET, PUT, DELETE, OPTIONS")
 	req.Header.Set("Authorization", basicAuth)
+	if strings.Contains(req.URL.Path, "/api/chartrepo/") && req.Method == "POST" {
+		req.Header.Set("accept", "*/*")
+		return
+	}
+
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("accept", "application/json")
 }
