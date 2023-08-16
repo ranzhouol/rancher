@@ -16,7 +16,7 @@ import (
 func RequestSetHeader(username, password string, req *http.Request) {
 	auth := username + ":" + password
 	basicAuth := "Basic " + base64.StdEncoding.EncodeToString([]byte(auth))
-
+	logrus.Info("req.header1: ", req.Header)
 	req.Header.Del("Cookie")
 	req.Header.Set("Access-Control-Allow-Origin", "*")
 	req.Header.Set("Access-Control-Allow-Methods", "POST, GET, PUT, DELETE, OPTIONS")
@@ -28,6 +28,7 @@ func RequestSetHeader(username, password string, req *http.Request) {
 
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("accept", "application/json")
+	logrus.Info("req.header2: ", req.Header)
 }
 
 func GetClient(username, password, urlPath string) ([]byte, error) {

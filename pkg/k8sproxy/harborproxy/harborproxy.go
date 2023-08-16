@@ -104,6 +104,11 @@ func (p *proxyContext) modifyResponse(resp *http.Response) error {
 		if err := syncProjectUserToHarbor(p, resp); err != nil {
 			logrus.Errorf("制品库用户同步失败:%v", err.Error())
 		}
+
+		// 更新项目配额
+		if err := harborproject.UpdateProjectQuota(p.UserInfo.authUsername, p.UserInfo.authPassword, p.Project.ProjectName, p.Project.StorageLimit); err != nil {
+			logrus.Errorf("制品库项目配额设置失败:%v", err.Error())
+		}
 	}
 	//}
 	return nil

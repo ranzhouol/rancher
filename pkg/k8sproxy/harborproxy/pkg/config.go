@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	HarborHost = "https://ranzhou.harbor.com"
+	HarborHost = "https://ranzhou2.harbor.com"
 	//HarborHost = "https://harbor-core.harbor.svc.cluster.local:443"
 
 	// harbor admin
