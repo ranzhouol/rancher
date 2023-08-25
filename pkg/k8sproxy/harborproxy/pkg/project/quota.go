@@ -42,7 +42,7 @@ func UpdateProjectQuota(authUsername, authPassword, projectName string, storageL
 	}
 
 	// 获取配额id
-	url := fmt.Sprintf("/api/v2.0/quotas??reference=project&reference_id=%v", p.ProjectId)
+	url := fmt.Sprintf("/api/v2.0/quotas?reference=project&reference_id=%v", p.ProjectId)
 	body, err := client.GetClient(authUsername, authPassword, url)
 	if err != nil {
 		return err

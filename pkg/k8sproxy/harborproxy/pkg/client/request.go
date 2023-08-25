@@ -26,6 +26,12 @@ func RequestSetHeader(username, password string, req *http.Request) {
 		return
 	}
 
+	// 下载ca证书
+	if strings.Contains(req.URL.Path, "/api/v2.0/systeminfo/getcert") && req.Method == "GET" {
+		req.Header.Set("accept", "application/octet-stream")
+		return
+	}
+
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("accept", "application/json")
 	logrus.Info("req.header2: ", req.Header)
